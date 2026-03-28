@@ -528,9 +528,9 @@ function drawHUD() {
     cx.fillText('🥩 BOSS! '+'🛡️'.repeat(3-boss.passCount)+'✅'.repeat(boss.passCount),400,26);
   } else if (state==='finalBoss'&&fb) {
     cx.fillStyle='#ff4444';
-    if (fb.phase==='fight') cx.fillText(`🦖 T-REX FINALE! Bistecche: ${fb.steaksDodged}/${fb.totalSteaks}`,400,26);
-    else if (fb.phase==='intro') cx.fillText('🦖 IL T-REX CARNIVORO ARRIVA!!!',400,26);
-    else if (fb.phase==='flee') cx.fillText('🏃 IL T-REX FUGGE!!! 🌿',400,26);
+    if (fb.phase==='fight') cx.fillText(`🦖 BARON VON BRACIOLA! Bistecche: ${fb.steaksDodged}/${fb.totalSteaks}`,400,26);
+    else if (fb.phase==='intro') cx.fillText('🦖 BARON VON BRACIOLA ARRIVA!!!',400,26);
+    else if (fb.phase==='flee') cx.fillText('🏃 BARON VON BRACIOLA FUGGE!!! 🌿',400,26);
     else if (fb.phase==='freed'||fb.phase==='romance') {cx.fillStyle='#ff69b4';cx.fillText('💕 GO VEG! ❤️ 💕',400,26);}
   } else if (state==='bonusStage'&&bs) {
     cx.fillStyle=`hsl(${(frame*4)%360},100%,70%)`;
@@ -591,10 +591,10 @@ function drawFinalBossScene() {
   if ((fb.phase==='intro'||fb.phase==='fight'||fb.phase==='flee') && fb.trexX < 960) {
     drawTRex(fb.trexX, fb.phase==='flee');
     if (fb.phase==='flee') {
-      speechBubble(Math.max(4,fb.trexX-220),GND-155,'Anemia mia! Vado in farmacia!!!','#cc0000');
+      speechBubble(Math.max(4,fb.trexX-220),GND-155,'Anemia mia! Vado in farmacia!!! — Baron von Braciola','#cc0000');
     } else if (fb.phase==='intro'&&frame%50<25) {
       cx.fillStyle='#ff2200';cx.font='bold 20px sans-serif';cx.textAlign='center';
-      cx.fillText('ROOOAAR!!!',fb.trexX+48,GND-110);
+      cx.fillText('ROOOAAR!!! Sono Baron von Braciola!',fb.trexX+48,GND-110);
     }
   }
 
@@ -659,7 +659,7 @@ function drawVictory() {
   cx.fillStyle='#c8860a';cx.font='bold 17px sans-serif';
   cx.fillText('Il Vegan Velociraptor ha salvato la fidanzata!',400,136);
   cx.fillStyle='#2d5a1b';cx.font='bold 15px sans-serif';
-  cx.fillText('🌿 Il veganesimo ha trionfato sul T-Rex carnivoro! 🌿',400,162);
+  cx.fillText('🌿 Il veganesimo ha trionfato su Baron von Braciola! 🌿',400,162);
   cx.fillStyle='rgba(0,0,0,0.08)';rr(220,180,360,68,10);cx.fill();
   cx.fillStyle='#333';cx.font='bold 26px sans-serif';
   cx.fillText('Punteggio finale: '+score,400,216);
@@ -730,7 +730,7 @@ function updateFinalBoss() {
       });
       if(fb.steaksDodged>=fb.totalSteaks){
         fb.phase='flee'; fb.phaseTimer=0; fb.trexVX=3; fb.steaks=[];
-        msg='Anemia mia! Vado in farmacia!!!'; msgTimer=240;
+        msg='Anemia mia! Vado in farmacia!!! — Baron von Braciola'; msgTimer=240;
         VVAudio.trexFlee(); score+=100;
       }
       break;
@@ -899,7 +899,7 @@ function drawMenu() {
   cx.fillText(window._hasTouched?'👆 Tap su = Salta (x2 doppio)  •  👇 Tap giù = Abbassati':'⬆ Spazio = Salta (x2 doppio)  •  ⬇ = Abbassati',400,157);
   cx.fillText('Raccogli verdure, evita la carne!',400,178);
   cx.fillStyle='#6a1fc2';cx.font='bold 13px sans-serif';cx.fillText('🌾 SEITAN = invincibile! 🥩 Boss di livello! 🦖 Boss finale!',400,200);
-  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🦖 Lvl '+MAX_LEVEL+': T-Rex carnivoro boss finale — salva la fidanzata! 💕',400,221);
+  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🦖 Lvl '+MAX_LEVEL+': Baron von Braciola boss finale — salva la fidanzata! 💕',400,221);
   cx.fillStyle='#666';cx.font='14px sans-serif';cx.fillText('Record: '+hiScore,400,244);
   if(Math.floor(frame/22)%2===0){
     cx.fillStyle='#2d5a1b';cx.font='bold 19px sans-serif';
@@ -983,7 +983,7 @@ function updateBonusStage() {
     fb={phase:'intro',trexX:920,trexVX:0,gfX:720,gfVX:0,
         steaks:[],steaksDodged:0,totalSteaks:10+loopCount*2,
         nextSteak:110,hitCooldown:60,phaseTimer:0,hearts:[]};
-    msg='⚠️ IL T-REX CARNIVORO HA RAPITO LA TUA FIDANZATA!!!';msgTimer=200;
+    msg='⚠️ BARON VON BRACIOLA tiene in ostaggio la tua fidanzata!!!';msgTimer=200;
     VVAudio.stopTheme();
   }
 }
@@ -1051,7 +1051,7 @@ function drawLoopEnd() {
   cx.fillStyle='#c8860a';cx.font='bold 18px sans-serif';
   cx.fillText(`Loop ${loopCount} completato! Velocita aumentata!`,400,130);
   cx.fillStyle='#2d5a1b';cx.font='bold 13px sans-serif';
-  cx.fillText('Il T-Rex e in fuga... ma tornera ancora piu arrabbiato!',400,156);
+  cx.fillText('Baron von Braciola e in fuga... ma tornera ancora piu arrabbiato!',400,156);
   cx.fillStyle='rgba(0,0,0,0.07)';rr(220,170,360,62,10);cx.fill();
   cx.fillStyle='#333';cx.font='bold 24px sans-serif';
   cx.fillText('Punteggio: '+score,400,207);
