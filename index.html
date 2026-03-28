@@ -56,8 +56,8 @@ const VVAudio = (() => {
   let muted = false, themeTimer = null, themeActive = false, _bpm = 165;
 
   const N = {
-    Bb2:116.54, B2:123.47,
-    C3:130.81, Db3:138.59, D3:146.83, Eb3:155.56, E3:164.81, F3:174.61, Gb3:185.00,
+    Bb2:116.54,
+    C3:130.81, Db3:138.59, Eb3:155.56, F3:174.61, Gb3:185.00,
     G3:196.00, Ab3:207.65, A3:220.00, Bb3:233.08, B3:246.94,
     C4:261.63, Db4:277.18, D4:293.66, Eb4:311.13, E4:329.63,
     F4:349.23, G4:392.00, Ab4:415.30, A4:440.00, Bb4:466.16, B4:493.88,
@@ -90,25 +90,15 @@ const VVAudio = (() => {
     return tot;
   }
 
-  // Vegan Velociraptor – Nanowar of Steel (chiptune 8-bit power metal, E minor)
   const MEL = [
-    // Riff A – gallop principale (4+4+4+4 = 16 beat)
-    [N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],
-    [N.G5,1],[N.E5,0.5],[N.D5,0.5],[N.B4,1],[N.A4,1],
-    [N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],
-    [N.D5,2],[N.B4,2],
-    // Riff B – chorus / lift (4+4+4+4 = 16 beat)
-    [N.A5,0.5],[N.G5,0.5],[N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],[N.G5,0.5],
-    [N.A5,1],[N.G5,1],[N.E5,2],
-    [N.A5,0.5],[N.G5,0.5],[N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.A4,0.5],[N.G4,0.5],[N.E4,0.5],
-    [N.E5,4],
+    [N.C5,1],[N.E5,1],[N.G5,2],[N.A5,1],[N.G5,1],[N.F5,2],
+    [N.E5,1],[N.G5,1],[N.C5,2],[N.D5,1],[N.F5,1],[N.G5,2],
+    [N.C6,2],[N.Bb5,2],[N.A5,1],[N.G5,1],[N.F5,2],
+    [N.E5,1],[N.D5,1],[N.E5,1],[N.F5,1],[N.C5,4],
   ];
   const BAS = [
-    // bass in E minor (32 beat, aligned con MEL)
-    [N.E3,2],[N.E3,2], [N.D3,2],[N.D3,2],
-    [N.A3,2],[N.A3,2], [N.B3,2],[N.B3,2],
-    [N.A3,2],[N.A3,2], [N.G3,2],[N.G3,2],
-    [N.A3,2],[N.A3,2], [N.E3,4],
+    [N.C3,2],[N.C3,2],[N.F3,2],[N.G3,2],[N.C3,2],[N.G3,2],[N.G3,4],
+    [N.Ab3,2],[N.Bb3,2],[N.F3,2],[N.F3,2],[N.G3,2],[N.G3,2],[N.C3,4],
   ];
 
   function _schedLoop() {
@@ -217,18 +207,6 @@ const VVAudio = (() => {
     [N.C3,N.G3,N.E3,N.C3].forEach((f,i)=>_tone(f,t0+i*1.2,1.1,0.12,'triangle'));
   }
 
-  function bonusArmageddon() {
-    if(muted) return; stopTheme();
-    const a=_ac(),t=a.currentTime;
-    // Stab apocalittici discendenti
-    [N.Bb3,N.Ab3,N.Gb3,N.Eb3].forEach((f,i)=>{
-      _tone(f,t+i*0.19,0.42,0.22,'sawtooth');
-      _tone(f*2,t+i*0.19,0.3,0.11,'square');
-    });
-    _tone(N.Bb2,t,0.9,0.25,'sawtooth');
-    setTimeout(()=>{_bpm=Math.max(185,_bpm+18);startTheme();},1000);
-  }
-
   function toggleMute() {
     muted=!muted;
     if(_master) _master.gain.value=muted?0:0.28;
@@ -236,7 +214,7 @@ const VVAudio = (() => {
     return muted;
   }
   return { startTheme,stopTheme,setBPM,vegJingle,lifeLost,seitanPowerUp,victory,
-           funeralMarch,trexRoar,trexFlee,loveTheme,finalVictory,bonusArmageddon,toggleMute };
+           funeralMarch,trexRoar,trexFlee,loveTheme,finalVictory,toggleMute };
 })();
 
 document.getElementById('mute-btn').addEventListener('click', e => {
@@ -245,7 +223,7 @@ document.getElementById('mute-btn').addEventListener('click', e => {
 });
 
 // --- Stato gioco ---
-// states: menu | play | boss | lvlend | gameover | finalBoss | victory | bonus
+// states: menu | play | boss | lvlend | gameover | bonusStage | finalBoss | loopEnd | victory
 let state = 'menu';
 let score, lives, level, spd, spdMod, frame, levelScore, levelTimer;
 let hiScore = +localStorage.getItem('vegaRapHi') || 0;
@@ -256,11 +234,12 @@ const QUIPS = ['Il tofu mi dà la forza!','Abbasso il capitalismo carnivoro!',
   'Verdure per sempre!','La carne fa paura!','Soia power!!!','Il tempeh è vita!','Vegan pride!'];
 let quip = null, quipTimer = 0, nextQuip = 350;
 let boss = null;
-let fb = null;  // final boss
-let bonus = null; // bonus stage
+let fb = null;   // final boss
+let bs = null;   // bonus stage
+let loopCount = 0;
 
 // --- Raptor ---
-const R = { x:100, y:GND-PH, vy:0, jumping:false, duck:false, jumps:0 };
+const R = { x:100, y:GND-PH, vy:0, jumping:false, duck:false, jumps:0, movingLeft:false, movingRight:false };
 const rTop = () => R.duck ? GND-DH : R.y;
 const rH   = () => R.duck ? DH     : PH;
 const rBox = () => ({ x:R.x+6, y:rTop()+6, w:PW-12, h:rH()-12 });
@@ -278,7 +257,7 @@ const VEGE = [
 
 // --- Input ---
 function doJump() {
-  if (state!=='play' && state!=='boss' && state!=='finalBoss' && state!=='bonus') return;
+  if (state!=='play' && state!=='boss' && state!=='finalBoss' && state!=='bonusStage') return;
   if (R.jumps < 2) {
     R.vy = R.jumps===0 ? JUMP_VY : JUMP_VY*0.82;
     R.jumping = true; R.jumps++;
@@ -289,29 +268,46 @@ function startGame() {
   state='play'; score=0; lives=3; level=1; spd=SPD_MIN; spdMod=0;
   frame=0; levelScore=0; levelTimer=0;
   objs=[]; coins=[]; msg=null; msgTimer=0;
-  R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
+  R.x=100; R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
+  R.movingLeft=false; R.movingRight=false;
   nextObj=80; nextVeg=70; nextSeitan=500;
   seitanActive=false; seitanTimer=0;
   quip=null; quipTimer=0; nextQuip=350;
-  boss=null; fb=null; bonus=null;
+  boss=null; fb=null; bs=null; loopCount=0;
   VVAudio.setBPM(SPD_MIN); VVAudio.startTheme();
 }
 
 window.addEventListener('keydown', e => {
-  if (state==='play'||state==='boss'||state==='finalBoss'||state==='bonus') {
+  if (state==='play'||state==='boss'||state==='finalBoss'||state==='bonusStage') {
     if (e.code==='ArrowUp'||e.code==='Space'){e.preventDefault();doJump();}
     if (e.code==='ArrowDown'){e.preventDefault();R.duck=true;}
+    if (state==='bonusStage') {
+      if (e.code==='ArrowLeft'){e.preventDefault();R.movingLeft=true;}
+      if (e.code==='ArrowRight'){e.preventDefault();R.movingRight=true;}
+    }
   } else if (e.code==='Enter'||e.code==='Space') {
     if (state==='victory'){state='menu';frame=0;VVAudio.stopTheme();}
     else startGame();
   }
 });
-window.addEventListener('keyup', e => { if (e.code==='ArrowDown') R.duck=false; });
+window.addEventListener('keyup', e => {
+  if (e.code==='ArrowDown') R.duck=false;
+  if (e.code==='ArrowLeft') R.movingLeft=false;
+  if (e.code==='ArrowRight') R.movingRight=false;
+});
 
 c.addEventListener('touchstart', e => {
   e.preventDefault();
+  window._hasTouched=true;
   const t = e.touches[0];
-  if (state==='play'||state==='boss'||state==='finalBoss'||state==='bonus') {
+  if (state==='bonusStage') {
+    const rect=c.getBoundingClientRect();
+    const tx=t.clientX;
+    if (tx < rect.left+rect.width*0.3)      { R.movingLeft=true; R.movingRight=false; }
+    else if (tx > rect.left+rect.width*0.7)  { R.movingRight=true; R.movingLeft=false; }
+    else if (t.clientY < rect.top+rect.height/2) doJump();
+    else R.duck=true;
+  } else if (state==='play'||state==='boss'||state==='finalBoss') {
     const rect=c.getBoundingClientRect();
     if (t.clientY < rect.top+rect.height/2) doJump(); else R.duck=true;
   } else if (state==='gameover') {
@@ -320,7 +316,10 @@ c.addEventListener('touchstart', e => {
     state='menu'; frame=0; VVAudio.stopTheme();
   } else startGame();
 }, {passive:false});
-c.addEventListener('touchend', e=>{e.preventDefault();R.duck=false;},{passive:false});
+c.addEventListener('touchend', e=>{
+  e.preventDefault();
+  R.duck=false; R.movingLeft=false; R.movingRight=false;
+},{passive:false});
 c.addEventListener('click', e=>{if(state==='gameover')handleClick(e.clientX,e.clientY);});
 
 function handleClick(cx_, cy_) {
@@ -504,143 +503,6 @@ function drawBg() {
   for(let i=0;i<9;i++){const sx=((frame*(spd||4)*0.6+i*105)%840)-20;cx.fillRect(sx,GND+8,65,5);}
 }
 
-// --- Sfondo Bonus Armageddon ---
-function drawBonusBg() {
-  const g=cx.createLinearGradient(0,0,0,GND);
-  g.addColorStop(0,'#0d0000');g.addColorStop(0.35,'#550000');
-  g.addColorStop(0.7,'#aa2200');g.addColorStop(1,'#dd5500');
-  cx.fillStyle=g;cx.fillRect(0,0,800,GND);
-  // Fiamme in cima
-  for(let i=0;i<14;i++){
-    const fx=(i*62+frame*0.8)%868;
-    const fh=28+Math.sin(frame*0.14+i*0.7)*16;
-    const fg=cx.createLinearGradient(fx,0,fx,fh+10);
-    fg.addColorStop(0,'rgba(255,200,0,0.95)');fg.addColorStop(0.5,'rgba(255,60,0,0.7)');fg.addColorStop(1,'rgba(255,0,0,0)');
-    cx.fillStyle=fg;
-    cx.beginPath();cx.moveTo(fx,fh+10);cx.quadraticCurveTo(fx+22,0,fx+44,fh+10);cx.fill();
-  }
-  // Braci volanti
-  for(let i=0;i<25;i++){
-    const ex=((i*51+frame*(1.2+i*0.08))%820);
-    const ey=((i*43+frame*(0.9+i*0.06))%(GND-30));
-    cx.fillStyle=`hsl(${20+i*7},100%,${55+i%4*10}%)`;
-    cx.beginPath();cx.arc(ex,ey,1+i%3,0,Math.PI*2);cx.fill();
-  }
-  // Terreno bruciato
-  cx.fillStyle='#1a0600';cx.fillRect(0,GND,800,400-GND);
-  cx.fillStyle='#331100';cx.fillRect(0,GND,800,5);
-  // Crepacci di lava
-  for(let i=0;i<6;i++){
-    const lx=(i*145+62)%800;
-    cx.strokeStyle='#ff3300';cx.lineWidth=1.5;cx.globalAlpha=0.45;
-    cx.beginPath();cx.moveTo(lx,GND);cx.lineTo(lx+10,GND+8);cx.lineTo(lx+3,GND+20);cx.stroke();
-    cx.globalAlpha=1;
-  }
-}
-
-// --- Bonus Stage update ---
-function updateBonus() {
-  if(!bonus) return;
-  if(bonus.survived){
-    if(--bonus.endTimer<=0){
-      level++;spd=SPD_MIN+level*0.4;spdMod=0;
-      objs=[];coins=[];bonus=null;seitanActive=false;seitanTimer=0;
-      nextObj=80;nextVeg=70;nextSeitan=500;
-      quip=null;quipTimer=0;nextQuip=350;
-      boss=null;levelScore=0;frame=0;
-      state='play';
-      VVAudio.setBPM(spd);VVAudio.startTheme();
-    }
-    return;
-  }
-  if(--bonus.timer<=0){
-    bonus.survived=true;bonus.endTimer=240;
-    msg='I dinosauri si sono estinti perché mangiavano carne! Io no!';msgTimer=230;
-    VVAudio.victory();
-    return;
-  }
-  // Spawn seitan
-  if(--nextSeitan<=0&&!seitanActive){
-    coins.push({emoji:'🌾',msg:'BESTIA DI SEITAN!!!',pts:30,x:820,y:GND-85,h:45,w:45,isSeitan:true});
-    nextSeitan=600+Math.floor(Math.random()*400);
-  }
-  // Muovi seitan orizzontalmente
-  const rb=rBox();
-  coins=coins.filter(v=>{
-    v.x-=spd;
-    if(ov(rb,v)){
-      if(v.isSeitan){
-        seitanActive=true;seitanTimer=SEITAN_DUR;score+=v.pts;
-        msg='Ora sono un super veg-velociraptor: una BESTIA DI SEITAN!';msgTimer=230;VVAudio.seitanPowerUp();
-      }
-      return false;
-    }
-    return v.x>-50;
-  });
-  // Spawn meteore
-  const intensity=Math.floor((2700-bonus.timer)/300);
-  if(--bonus.nextMeteor<=0){
-    bonus.meteors.push({
-      x:40+Math.random()*720,y:-40,
-      vy:3.5+Math.random()*2.8+intensity*0.35,
-      vx:(Math.random()-0.5)*2.4,
-      size:34+Math.random()*24,
-      angle:Math.random()*Math.PI*2,
-      spin:(Math.random()-0.5)*0.18
-    });
-    bonus.nextMeteor=Math.max(16,52-intensity*5)+Math.floor(Math.random()*24);
-  }
-  // Aggiorna meteore + collisioni
-  bonus.meteors=bonus.meteors.filter(m=>{
-    m.y+=m.vy;m.x+=m.vx;m.angle+=m.spin;
-    if(m.y>GND+20)return false;
-    const hitBox={x:m.x-m.size*0.28,y:m.y-m.size*0.42,w:m.size*0.56,h:m.size*0.52};
-    if(!seitanActive&&ov(rb,hitBox)){
-      lives--;msg='COLPITO DA UNA POLPETTA COSMICA!';msgTimer=110;VVAudio.lifeLost();
-      if(lives<=0){
-        state='gameover';bonus=null;
-        if(score>hiScore){hiScore=score;localStorage.setItem('vegaRapHi',hiScore);}
-        VVAudio.funeralMarch();
-      }
-      return false;
-    }
-    return true;
-  });
-  if(frame%30===0)score++;
-  spd=SPD_MIN+level*0.4+spdMod;
-  if(frame%60===0)VVAudio.setBPM(spd);
-}
-
-// --- Disegna Bonus Stage ---
-function drawBonusStage() {
-  drawBonusBg();drawTouchZones();
-  // Seitan
-  coins.forEach(v=>{
-    if(v.isSeitan){cx.save();cx.shadowColor='#cc88ff';cx.shadowBlur=14+Math.sin(frame*0.2)*6;
-      cx.font='38px serif';cx.textAlign='left';cx.fillText(v.emoji,v.x,v.y+v.h);cx.restore();}
-  });
-  // Meteore polpette
-  bonus.meteors.forEach(m=>{
-    cx.save();cx.translate(m.x,m.y);cx.rotate(m.angle);
-    cx.shadowColor='#ff5500';cx.shadowBlur=22+Math.sin(frame*0.2)*8;
-    cx.font=`${Math.round(m.size)}px serif`;cx.textAlign='center';cx.fillText('🍖',0,0);
-    cx.restore();
-  });
-  // Banner armageddon
-  cx.fillStyle='rgba(130,0,0,0.88)';rr(50,43,700,40,10);cx.fill();
-  cx.strokeStyle='#ff5500';cx.lineWidth=2;rr(50,43,700,40,10);cx.stroke();
-  const ts=bonus.survived?0:Math.ceil(bonus.timer/60);
-  cx.fillStyle=bonus.survived?'#88ff88':'#ffcc00';
-  cx.font='bold 13px sans-serif';cx.textAlign='center';
-  cx.fillText(
-    bonus.survived
-      ?"🌿 I dinosauri si estinsero perché mangiavano carne! Io no! 🌿"
-      :`🔥 BONUS STAGE: SOPRAVVIVI ALL'ARMAGEDDON! 🔥   ⏱ ${ts}s`,
-    400,69);
-  drawRaptor(R.x,R.duck?GND-DH:R.y,R.duck);
-  drawHUD();drawGameBubbles();
-}
-
 // --- HUD ---
 function drawHUD() {
   cx.fillStyle='rgba(0,0,0,0.45)';cx.fillRect(0,0,800,38);
@@ -659,10 +521,9 @@ function drawHUD() {
     else if (fb.phase==='intro') cx.fillText('🦖 IL T-REX CARNIVORO ARRIVA!!!',400,26);
     else if (fb.phase==='flee') cx.fillText('🏃 IL T-REX FUGGE!!! 🌿',400,26);
     else if (fb.phase==='freed'||fb.phase==='romance') {cx.fillStyle='#ff69b4';cx.fillText('💕 GO VEG! ❤️ 💕',400,26);}
-  } else if (state==='bonus'&&bonus) {
-    const ts=bonus.survived?0:Math.ceil(bonus.timer/60);
-    cx.fillStyle=bonus.survived?'#44ff44':'#ff4400';
-    cx.fillText(bonus.survived?'🌿 SOPRAVVISSUTO! VEGAN POWER! 🌿':`🔥 ARMAGEDDON: ${ts}s rimasti 🔥`,400,26);
+  } else if (state==='bonusStage'&&bs) {
+    cx.fillStyle=`hsl(${(frame*4)%360},100%,70%)`;
+    cx.fillText(`⭐ BONUS STAGE! Polpette schivate: ${bs.dodged} ⭐`,400,26);
   } else {
     cx.fillStyle='white';
     const spdBar=spdMod>0?' 🔥'.repeat(Math.min(3,Math.ceil(spdMod/0.5))):'  ✅';
@@ -828,17 +689,20 @@ function updateFinalBoss() {
 
     case 'fight': {
       if (fb.hitCooldown>0) fb.hitCooldown--;
-      // Lancia bistecche
+      // Lancia bistecche — 2 altezze: ABBASSATI (GND-22) o SALTA (GND-8)
+      // hitbox steak: {y:s.y-30, h:28}
+      // GND-22=318 → box [288,316]: colpisce in piedi (291-334), NON duck (318-334) → ABBASSATI
+      // GND-8=332  → box [302,330]: colpisce sia in piedi che duck → SALTA
       if (--fb.nextSteak<=0 && fb.steaksDodged<fb.totalSteaks) {
-        const r=Math.random();
-        const sy=r<0.38?GND-32:r<0.76?GND-100:GND-62;
-        fb.steaks.push({x:fb.trexX-18,y:sy,speed:4.5+Math.random()*2.2,angle:0});
-        fb.nextSteak=75+Math.floor(Math.random()*55);
+        const sy=Math.random()<0.5 ? GND-22 : GND-8;
+        const spBase=5.5+loopCount*0.4+Math.random()*1.0;
+        fb.steaks.push({x:fb.trexX-18,y:sy,speed:spBase,angle:0});
+        fb.nextSteak=70+Math.floor(Math.random()*50);
       }
-      // Muovi bistecche
+      // Muovi bistecche — traiettoria rettilinea orizzontale, velocità costante
       const rb=rBox();
       fb.steaks=fb.steaks.filter(s=>{
-        s.x-=s.speed; s.angle+=0.1;
+        s.x-=s.speed; s.angle+=0.06;
         if(s.x<-50){fb.steaksDodged++;return false;}
         const sBox={x:s.x+3,y:s.y-30,w:28,h:28};
         if(!seitanActive&&fb.hitCooldown<=0&&ov(rb,sBox)){
@@ -887,7 +751,13 @@ function updateFinalBoss() {
       }
       fb.hearts.forEach(h=>{h.y+=h.vy;h.alpha-=0.011;});
       fb.hearts=fb.hearts.filter(h=>h.alpha>0);
-      if(fb.phaseTimer>300){state='victory';frame=0;VVAudio.finalVictory();}
+      if(fb.phaseTimer>300){
+        loopCount++;
+        score+=300;
+        if(score>hiScore){hiScore=score;localStorage.setItem('vegaRapHi',hiScore);}
+        state='loopEnd'; levelTimer=280; fb=null;
+        VVAudio.finalVictory();
+      }
       break;
   }
 }
@@ -898,14 +768,14 @@ function update() {
   if(msg&&--msgTimer<=0) msg=null;
   if(quip&&--quipTimer<=0) quip=null;
 
-  if(state==='play'||state==='boss'||state==='finalBoss'||state==='bonus'){
+  if(state==='play'||state==='boss'||state==='finalBoss'||state==='bonusStage'){
     R.vy+=GRAVITY; R.y+=R.vy;
     if(R.y>=GND-PH){R.y=GND-PH;R.vy=0;R.jumping=false;R.jumps=0;}
     if(seitanActive&&--seitanTimer<=0){seitanActive=false;msg='Il potere del seitan è finito...';msgTimer=70;}
   }
 
-  if(state==='bonus'){updateBonus();return;}
   if(state==='finalBoss'){updateFinalBoss();return;}
+  if(state==='bonusStage'){updateBonusStage();return;}
 
   if(state==='boss'){
     if(!boss) return;
@@ -990,13 +860,13 @@ function update() {
 
   if(levelScore>=200+level*60){
     objs=[];coins=[];
-    if(level%5===0){
-      // BONUS STAGE ogni 5 livelli!
-      state='bonus';
-      bonus={timer:2700,meteors:[],nextMeteor:55,survived:false,endTimer:0};
-      levelScore=0;
-      msg='🔥 ARMAGEDDON IN ARRIVO!!! 🔥';msgTimer=160;
-      VVAudio.bonusArmageddon();
+    if(level>=MAX_LEVEL){
+      // Prima la BONUS STAGE, poi il boss finale
+      state='bonusStage';
+      bs={timer:660, meatballs:[], nextMeat:60, dodged:0};
+      R.x=100; R.movingLeft=false; R.movingRight=false;
+      msg='⭐ BONUS STAGE! Schiva le polpette! ← → per muoverti!';msgTimer=220;
+      VVAudio.victory();
     } else {
       state='boss';
       boss={x:900,phase:0,passCount:0,spd:spd+1.5,hitCooldown:60};
@@ -1016,14 +886,12 @@ function drawMenu() {
   cx.fillText(window._hasTouched?'👆 Tap su = Salta (x2 doppio)  •  👇 Tap giù = Abbassati':'⬆ Spazio = Salta (x2 doppio)  •  ⬇ = Abbassati',400,157);
   cx.fillText('Raccogli verdure, evita la carne!',400,178);
   cx.fillStyle='#6a1fc2';cx.font='bold 13px sans-serif';cx.fillText('🌾 SEITAN = invincibile! 🥩 Boss di livello! 🦖 Boss finale!',400,200);
-  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🔥 Ogni 5 livelli: BONUS STAGE — Armageddon delle Polpette! Loop infinito! 🍖',400,221);
+  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🦖 Lvl '+MAX_LEVEL+': T-Rex carnivoro boss finale — salva la fidanzata! 💕',400,221);
   cx.fillStyle='#666';cx.font='14px sans-serif';cx.fillText('Record: '+hiScore,400,244);
   if(Math.floor(frame/22)%2===0){
     cx.fillStyle='#2d5a1b';cx.font='bold 19px sans-serif';
     cx.fillText(window._hasTouched?'▶  TOCCA PER INIZIARE  ◀':'▶  PREMI SPAZIO PER INIZIARE  ◀',400,275);
   }
-  cx.fillStyle='#999';cx.font='11px sans-serif';cx.textAlign='center';
-  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,300);
 }
 function drawLevelEnd() {
   drawBg();
@@ -1042,8 +910,140 @@ function drawGameOver() {
   if(score>0&&score>=hiScore){cx.fillStyle='#c8860a';cx.font='bold 17px sans-serif';cx.fillText('🏆 NUOVO RECORD! 🏆',400,178);}
   btn(215,215,160,47,'Riprova','#4CAF50');
   btn(425,215,190,47,'Menu principale','#2196F3');
-  cx.fillStyle='#888';cx.font='11px sans-serif';cx.textAlign='center';
-  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,285);
+}
+
+// --- Bonus Stage ---
+function updateBonusStage() {
+  if (!bs) return;
+  // Movimento orizzontale raptor
+  if (R.movingLeft)  R.x = Math.max(12, R.x - 4.5);
+  if (R.movingRight) R.x = Math.min(720, R.x + 4.5);
+
+  bs.timer--;
+
+  // Spawn polpette cadenti da posizioni X casuali
+  if (--bs.nextMeat <= 0) {
+    const dropX = 60 + Math.random() * 680;
+    const speed  = 4.5 + Math.random() * 3.5 + Math.floor((660-bs.timer)/120)*0.4;
+    bs.meatballs.push({x:dropX, y:-45, vy:speed});
+    const interval = Math.max(22, 58 - Math.floor((660-bs.timer)/80)*6);
+    bs.nextMeat = interval + Math.floor(Math.random()*20);
+  }
+
+  // Aggiorna polpette e collisioni
+  const rb = rBox();
+  bs.meatballs = bs.meatballs.filter(m => {
+    m.y += m.vy;
+    if (m.y > GND + 60) { bs.dodged++; score+=3; levelScore+=3; return false; }
+    const mBox = {x:m.x-16, y:m.y-16, w:32, h:32};
+    if (ov(rb, mBox)) {
+      lives--;
+      VVAudio.lifeLost();
+      if (lives <= 0) {
+        state='gameover'; bs=null;
+        R.x=100; R.movingLeft=false; R.movingRight=false;
+        if (score>hiScore){hiScore=score;localStorage.setItem('vegaRapHi',hiScore);}
+        VVAudio.funeralMarch();
+        return false;
+      }
+      msg='🍖 POLPETTA IN TESTA!'; msgTimer=70;
+      return false;
+    }
+    return true;
+  });
+
+  // Quips
+  if (!quip && --nextQuip<=0) {
+    quip=QUIPS[Math.floor(Math.random()*QUIPS.length)]; quipTimer=100;
+    nextQuip=300+Math.floor(Math.random()*200);
+  }
+
+  if (bs.timer <= 0) {
+    // Bonus stage superata — avvia il boss finale
+    R.x=100; R.movingLeft=false; R.movingRight=false;
+    bs=null;
+    state='finalBoss';
+    fb={phase:'intro',trexX:920,trexVX:0,gfX:720,gfVX:0,
+        steaks:[],steaksDodged:0,totalSteaks:10+loopCount*2,
+        nextSteak:110,hitCooldown:60,phaseTimer:0,hearts:[]};
+    msg='⚠️ IL T-REX CARNIVORO HA RAPITO LA TUA FIDANZATA!!!';msgTimer=200;
+    VVAudio.stopTheme();
+  }
+}
+
+function drawBonusStage() {
+  if (!bs) return;
+  // Sfondo speciale bonus
+  const g=cx.createLinearGradient(0,0,0,GND);
+  g.addColorStop(0,'#0d0d2b'); g.addColorStop(1,'#1a1a4a');
+  cx.fillStyle=g; cx.fillRect(0,0,800,GND);
+  // Stelle
+  for(let i=0;i<24;i++){
+    const sx=((i*127+frame*0.2)%800+800)%800;
+    const sy=10+((i*53)%180);
+    cx.fillStyle=`rgba(255,255,255,${0.4+Math.sin(frame*0.07+i)*0.3})`;
+    cx.beginPath();cx.arc(sx,sy,1.3,0,Math.PI*2);cx.fill();
+  }
+  cx.fillStyle='#4CAF50';cx.fillRect(0,GND,800,400-GND);
+  cx.fillStyle='#388E3C';cx.fillRect(0,GND,800,8);
+  // Barra timer
+  const prog=bs.timer/660;
+  cx.fillStyle='rgba(255,255,255,0.15)';cx.fillRect(0,395,800,5);
+  cx.fillStyle=`hsl(${prog*120},100%,55%)`;cx.fillRect(0,395,800*prog,5);
+  // Polpette cadenti
+  cx.font='32px serif';
+  bs.meatballs.forEach(m=>{
+    cx.save();cx.translate(m.x,m.y);cx.rotate(frame*0.12);
+    cx.textAlign='center';cx.fillText('🥩',0,0);cx.restore();
+  });
+  // Istruzioni touch (solo mobile)
+  if (window._hasTouched) {
+    cx.save();cx.globalAlpha=0.13;
+    cx.fillStyle='#0066ff';cx.fillRect(0,38,240,357);
+    cx.fillStyle='#ff4400';cx.fillRect(560,38,240,357);
+    cx.globalAlpha=0.55;cx.font='bold 13px sans-serif';
+    cx.fillStyle='#003388';cx.textAlign='left';cx.fillText('◀ SINISTRA',8,378);
+    cx.fillStyle='#882200';cx.textAlign='right';cx.fillText('DESTRA ▶',792,378);
+    cx.restore();
+  }
+  // Istruzioni keyboard
+  if (!window._hasTouched) {
+    cx.fillStyle='rgba(255,255,255,0.5)';cx.font='11px sans-serif';cx.textAlign='right';
+    cx.fillText('← → muoviti  •  ↑/Spazio salta  •  ↓ abbassati',795,56);
+  }
+  drawRaptor(R.x, R.duck?GND-DH:R.y, R.duck);
+  drawHUD();
+  drawGameBubbles();
+}
+
+// --- Loop End (dopo boss finale — ripartenza con difficoltà aumentata) ---
+function drawLoopEnd() {
+  drawBg();
+  for(let i=0;i<30;i++){
+    const vx=(i*83+frame*(1+i*0.04))%800;
+    const vy=((i*67+frame*1.5)%(GND+20));
+    cx.fillStyle=`hsl(${(i*47+frame)%360},100%,60%)`;
+    cx.save();cx.translate(vx,vy);cx.rotate(frame*0.05+i);cx.fillRect(-4,-6,8,12);cx.restore();
+  }
+  drawRaptor(260,GND-PH,false);
+  drawGFRaptor(320,GND-PH);
+  cx.fillStyle='rgba(255,255,255,0.94)';rr(70,42,660,225,18);cx.fill();
+  cx.strokeStyle='#FFD700';cx.lineWidth=4;rr(70,42,660,225,18);cx.stroke();
+  cx.fillStyle='#1a5c0a';cx.font='bold 36px sans-serif';cx.textAlign='center';
+  cx.fillText('🏆 BOSS SCONFITTO! 🏆',400,96);
+  cx.fillStyle='#c8860a';cx.font='bold 18px sans-serif';
+  cx.fillText(`Loop ${loopCount} completato! Velocita aumentata!`,400,130);
+  cx.fillStyle='#2d5a1b';cx.font='bold 13px sans-serif';
+  cx.fillText('Il T-Rex e in fuga... ma tornera ancora piu arrabbiato!',400,156);
+  cx.fillStyle='rgba(0,0,0,0.07)';rr(220,170,360,62,10);cx.fill();
+  cx.fillStyle='#333';cx.font='bold 24px sans-serif';
+  cx.fillText('Punteggio: '+score,400,207);
+  if(score>=hiScore){cx.fillStyle='#e06000';cx.font='bold 13px sans-serif';cx.fillText('🏆 RECORD!',400,228);}
+  const bar=Math.floor((280-levelTimer)/280*100);
+  cx.fillStyle='rgba(255,255,255,0.2)';cx.fillRect(220,242,360,9);
+  cx.fillStyle='#4ecdc4';cx.fillRect(220,242,360*(bar/100),9);
+  cx.fillStyle='#2d5a1b';cx.font='bold 13px sans-serif';
+  cx.fillText('Ripartenza loop '+(loopCount+1)+'...',400,258);
 }
 
 // --- Loop ---
@@ -1064,11 +1064,25 @@ function loop() {
     drawBg();drawTouchZones();drawBoss();
     drawRaptor(R.x,R.duck?GND-DH:R.y,R.duck);drawHUD();drawGameBubbles();return;
   }
-  if(state==='bonus'){drawBonusStage();return;}
+  if(state==='bonusStage'){drawBonusStage();return;}
   if(state==='finalBoss'){drawFinalBossScene();return;}
   if(state==='lvlend'){
     if(--levelTimer<=0){level++;state='play';nextObj=80;nextVeg=70;}
     drawLevelEnd();drawHUD();return;
+  }
+  if(state==='loopEnd'){
+    if(--levelTimer<=0){
+      // Riparti dal livello 1 con difficoltà aumentata
+      level=1; spdMod=loopCount*1.3; levelScore=0; levelTimer=0;
+      objs=[]; coins=[]; boss=null; fb=null; bs=null;
+      nextObj=80; nextVeg=70; nextSeitan=500;
+      seitanActive=false; seitanTimer=0;
+      R.x=100; R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
+      R.movingLeft=false; R.movingRight=false;
+      state='play';
+      VVAudio.setBPM(spdMod+SPD_MIN); VVAudio.startTheme();
+    }
+    drawLoopEnd(); drawHUD(); return;
   }
   if(state==='gameover'){drawGameOver();return;}
   if(state==='victory'){drawVictory();return;}
