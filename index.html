@@ -2,19 +2,40 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Vegan Velociraptor</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; touch-action:none; }
-body { background:#1a1a2e; display:flex; align-items:center; justify-content:center; height:100vh; }
-canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; max-width:100%; max-height:100vh; }
+html, body { width:100%; height:100%; overflow:hidden; background:#1a1a2e;
+  display:flex; align-items:center; justify-content:center; }
+canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; }
+/* Avviso modalità verticale su mobile */
+#rot { display:none; position:fixed; inset:0; background:#1a1a2e; color:white;
+  font:bold 20px sans-serif; flex-direction:column; align-items:center;
+  justify-content:center; text-align:center; gap:16px; z-index:99; }
+@media (orientation:portrait) and (max-width:768px) { #rot { display:flex; } }
 </style>
 </head>
 <body>
+<div id="rot">
+  <div style="font-size:52px">📱↔️</div>
+  <div>Ruota il telefono<br>per giocare!</div>
+</div>
 <canvas id="c"></canvas>
 <script>
 const c = document.getElementById('c'), cx = c.getContext('2d');
 c.width = 800; c.height = 400;
+
+// --- Adatta canvas allo schermo mantenendo risoluzione interna 800×400 ---
+function resize() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const scale = Math.min(vw / 800, vh / 400);
+  c.style.width  = Math.floor(800 * scale) + 'px';
+  c.style.height = Math.floor(400 * scale) + 'px';
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+resize();
 
 // --- Costanti fisiche ---
 const GND = 340;   // y suolo
@@ -84,7 +105,9 @@ c.addEventListener('touchstart', e => {
   e.preventDefault();
   const t = e.touches[0];
   if (state === 'play') {
-    if (t.clientY < window.innerHeight / 2) doJump(); else R.duck = true;
+    // Split al centro del canvas (non della finestra intera)
+    const rect = c.getBoundingClientRect();
+    if (t.clientY < rect.top + rect.height / 2) doJump(); else R.duck = true;
   } else if (state === 'gameover') {
     handleClick(t.clientX, t.clientY);
   } else startGame();
@@ -215,6 +238,29 @@ function drawHUD() {
   cx.fillText('Punti: ' + score + '  |  Best: ' + hiScore, 792, 26);
 }
 
+// --- Zone tocco (visibili solo su touch device) ---
+function drawTouchZones() {
+  // Mostra solo se è un dispositivo touch (rilevato dal primo tocco)
+  if (!window._hasTouched) return;
+  cx.save();
+  cx.globalAlpha = 0.10;
+  // Zona superiore = salta
+  cx.fillStyle = '#00ff88';
+  cx.fillRect(0, 38, 800, 162);
+  // Zona inferiore = abbassati
+  cx.fillStyle = '#ff6644';
+  cx.fillRect(0, 200, 800, 200);
+  cx.globalAlpha = 0.55;
+  cx.font = 'bold 15px sans-serif'; cx.textAlign = 'left'; cx.fillStyle = '#006633';
+  cx.fillText('👆 TAP = SALTA', 10, 58);
+  cx.fillStyle = '#aa2200';
+  cx.fillText('👇 TAP = ABBASSATI', 10, 390);
+  cx.restore();
+}
+
+// Segna che è un device touch al primo tocco
+window.addEventListener('touchstart', () => { window._hasTouched = true; }, { once: true, passive: true });
+
 // --- Update ---
 function update() {
   bgX -= 0.5;
@@ -301,13 +347,18 @@ function drawMenu() {
   cx.fillStyle = '#FF6B6B'; cx.font = 'bold 17px sans-serif';
   cx.fillText('"Tofu o non essere!"', 400, 145);
   cx.fillStyle = '#444'; cx.font = '14px sans-serif';
-  cx.fillText('⬆ / Spazio = Salta   •   ⬇ = Abbassati', 400, 174);
+  if (window._hasTouched) {
+    cx.fillText('👆 Tap in alto = Salta   •   👇 Tap in basso = Abbassati', 400, 174);
+  } else {
+    cx.fillText('⬆ / Spazio = Salta   •   ⬇ = Abbassati', 400, 174);
+  }
   cx.fillText('Raccogli verdure, evita la carne!', 400, 196);
   cx.fillStyle = '#666'; cx.fillText('Record: ' + hiScore, 400, 218);
 
   if (Math.floor(frame / 22) % 2 === 0) {
     cx.fillStyle = '#2d5a1b'; cx.font = 'bold 19px sans-serif';
-    cx.fillText('▶  PREMI SPAZIO O TOCCA PER INIZIARE  ◀', 400, 260);
+    const startMsg = window._hasTouched ? '▶  TOCCA PER INIZIARE  ◀' : '▶  PREMI SPAZIO O TOCCA PER INIZIARE  ◀';
+    cx.fillText(startMsg, 400, 260);
   }
 }
 
@@ -358,6 +409,7 @@ function loop() {
 
   if (state === 'play') {
     drawBg();
+    drawTouchZones();
     cx.font = '34px serif'; cx.textAlign = 'left';
     [...objs, ...coins].forEach(o => cx.fillText(o.emoji, o.x, o.y + o.h));
     drawRaptor(R.x, R.duck ? GND-DH : R.y, R.duck);
