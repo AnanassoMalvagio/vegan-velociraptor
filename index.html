@@ -905,6 +905,8 @@ function drawMenu() {
     cx.fillStyle='#2d5a1b';cx.font='bold 19px sans-serif';
     cx.fillText(window._hasTouched?'▶  TOCCA PER INIZIARE  ◀':'▶  PREMI SPAZIO PER INIZIARE  ◀',400,275);
   }
+  cx.fillStyle='#888';cx.font='11px sans-serif';cx.textAlign='center';
+  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,300);
 }
 function drawLevelEnd() {
   drawBg();
@@ -923,6 +925,8 @@ function drawGameOver() {
   if(score>0&&score>=hiScore){cx.fillStyle='#c8860a';cx.font='bold 17px sans-serif';cx.fillText('🏆 NUOVO RECORD! 🏆',400,178);}
   btn(215,215,160,47,'Riprova','#4CAF50');
   btn(425,215,190,47,'Menu principale','#2196F3');
+  cx.fillStyle='#888';cx.font='11px sans-serif';cx.textAlign='center';
+  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,285);
 }
 
 // --- Bonus Stage ---
