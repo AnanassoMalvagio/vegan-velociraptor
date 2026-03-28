@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Vegan Velociraptor</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; touch-action:none; }
+body { background:#1a1a2e; display:flex; align-items:center; justify-content:center; height:100vh; }
+canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; max-width:100%; max-height:100vh; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const c = document.getElementById('c'), cx = c.getContext('2d');
+c.width = 800; c.height = 400;
+
+// --- Costanti fisiche ---
+const GND = 340;   // y suolo
+const PH  = 55;    // altezza raptor in piedi
+const PW  = 45;    // larghezza raptor
+const DH  = 28;    // altezza raptor abbassato
+const GRAVITY = 0.7;
+const JUMP_VY = -14;
+
+// --- Stato gioco ---
+let state = 'menu';   // menu | play | lvlend | gameover
+let score, lives, level, spd, frame, levelScore, levelTimer;
+let hiScore = +localStorage.getItem('vegaRapHi') || 0;
+let objs = [], coins = [], msg = null, msgTimer = 0;
+let bgX = 0;
+let nextObj, nextVeg;
+
+// --- Raptor ---
+const R = { x:100, y:GND-PH, vy:0, jumping:false, duck:false };
+const rTop = () => R.duck ? GND-DH   : R.y;
+const rH   = () => R.duck ? DH       : PH;
+// Box collisione (leggermente inset)
+const rBox = () => ({ x:R.x+6, y:rTop()+6, w:PW-12, h:rH()-12 });
+
+// --- Dati ostacoli: [emoji, isAlto, messaggio] ---
+// isAlto=true => vola in aria (abbassati), false => a terra (salta)
+const MOBS = [
+  ['🥩', false, "NOOO! LA BISTECCA!"],
+  ['🌭', false, "NOOO! L'HOT DOG!"],
+  ['🍗', true,  "NOOO! IL POLLO!"],
+  ['🥚', false, "NOOO! LE UOVA!"],
+  ['🧀', false, "NOOO! IL FORMAGGIO!"],
+  ['🥛', false, "NOOO! IL LATTE!"],
+  ['🍖', true,  "NOOO! LA BRACIOLA!"],
+];
+
+// --- Dati raccoglibili: [emoji, messaggio, punti] ---
+const VEGE = [
+  ['🥦', 'BROCCOLO POWER!',  10],
+  ['🥕', 'CAROTA BOOST!',     8],
+  ['🥗', 'INSALATA FRESCA!',  6],
+  ['🍵', 'TOFU TIME!',       12],
+  ['🌿', 'CARCIOFO ENERGY!',  9],
+];
+
+// --- Input ---
+function doJump() {
+  if (!R.jumping && state === 'play') { R.vy = JUMP_VY; R.jumping = true; }
+}
+function startGame() {
+  state = 'play'; score = 0; lives = 3; level = 1; spd = 3.5;
+  frame = 0; levelScore = 0; levelTimer = 0;
+  objs = []; coins = []; msg = null; msgTimer = 0;
+  R.y = GND-PH; R.vy = 0; R.jumping = false; R.duck = false;
+  nextObj = 80; nextVeg = 70;
+}
+
+window.addEventListener('keydown', e => {
+  if (state === 'play') {
+    if (e.code === 'ArrowUp' || e.code === 'Space') { e.preventDefault(); doJump(); }
+    if (e.code === 'ArrowDown') { e.preventDefault(); R.duck = true; }
+  } else if (e.code === 'Enter' || e.code === 'Space') startGame();
+});
+window.addEventListener('keyup', e => { if (e.code === 'ArrowDown') R.duck = false; });
+
+c.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  if (state === 'play') {
+    if (t.clientY < window.innerHeight / 2) doJump(); else R.duck = true;
+  } else if (state === 'gameover') {
+    handleClick(t.clientX, t.clientY);
+  } else startGame();
+}, { passive: false });
+c.addEventListener('touchend', e => { e.preventDefault(); R.duck = false; }, { passive: false });
+c.addEventListener('click', e => { if (state === 'gameover') handleClick(e.clientX, e.clientY); });
+
+function handleClick(cx_, cy_) {
+  const rect = c.getBoundingClientRect();
+  const mx = (cx_ - rect.left) * (c.width  / rect.width);
+  const my = (cy_ - rect.top)  * (c.height / rect.height);
+  if (mx>215 && mx<375 && my>215 && my<262) startGame();
+  if (mx>425 && mx<615 && my>215 && my<262) { state = 'menu'; frame = 0; }
+}
+
+// --- Helpers canvas ---
+function rr(x, y, w, h, r) {
+  cx.beginPath();
+  cx.moveTo(x+r, y); cx.arcTo(x+w, y, x+w, y+h, r); cx.arcTo(x+w, y+h, x, y+h, r);
+  cx.arcTo(x, y+h, x, y, r); cx.arcTo(x, y, x+w, y, r); cx.closePath();
+}
+function btn(x, y, w, h, txt, bg) {
+  cx.fillStyle = bg; rr(x, y, w, h, 10); cx.fill();
+  cx.fillStyle = 'white'; cx.font = 'bold 17px sans-serif'; cx.textAlign = 'center';
+  cx.fillText(txt, x + w/2, y + h*0.64);
+}
+function speechBubble(x, y, txt, col) {
+  cx.font = 'bold 14px sans-serif';
+  const bw = Math.max(cx.measureText(txt).width + 24, 180), bh = 38;
+  cx.fillStyle = 'white'; cx.strokeStyle = '#333'; cx.lineWidth = 2;
+  rr(x, y, bw, bh, 8); cx.fill(); cx.stroke();
+  cx.beginPath();
+  cx.moveTo(x+14, y+bh); cx.lineTo(x+6, y+bh+13); cx.lineTo(x+26, y+bh);
+  cx.closePath(); cx.fillStyle = 'white'; cx.fill(); cx.stroke();
+  cx.fillStyle = col; cx.textAlign = 'left';
+  cx.fillText(txt, x + 12, y + bh - 10);
+}
+
+// --- Disegna raptor ---
+// Uso x,y,duck come parametri per riusarlo nel menu/lvlend
+function drawRaptor(rx, ry, duck) {
+  const G = '#5D8A3C', DG = '#3a6a1f';
+  cx.save();
+  if (duck) {
+    const dy = GND - DH;
+    cx.fillStyle = G;
+    // Coda
+    cx.beginPath(); cx.moveTo(rx+2,dy+18); cx.lineTo(rx-18,dy+8); cx.lineTo(rx+4,dy+24); cx.closePath(); cx.fill();
+    // Corpo
+    cx.beginPath(); cx.ellipse(rx+22, dy+17, 24, 13, 0, 0, Math.PI*2); cx.fill();
+    // Testa
+    cx.beginPath(); cx.ellipse(rx+43, dy+9, 12, 9, 0.4, 0, Math.PI*2); cx.fill();
+    // Occhio
+    cx.fillStyle = 'white'; cx.beginPath(); cx.arc(rx+47, dy+6, 4, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#111';  cx.beginPath(); cx.arc(rx+48, dy+6, 2, 0, Math.PI*2); cx.fill();
+    // Gambe
+    const lg = Math.sin(frame*0.3) * 7;
+    cx.strokeStyle = DG; cx.lineWidth = 4;
+    cx.beginPath(); cx.moveTo(rx+16, dy+28); cx.lineTo(rx+14+lg, GND); cx.stroke();
+    cx.beginPath(); cx.moveTo(rx+28, dy+28); cx.lineTo(rx+30-lg, GND); cx.stroke();
+  } else {
+    // Coda
+    cx.fillStyle = G;
+    cx.beginPath(); cx.moveTo(rx+5,ry+PH*.60); cx.lineTo(rx-20,ry+PH*.35); cx.lineTo(rx+3,ry+PH*.72); cx.closePath(); cx.fill();
+    // Corpo
+    cx.beginPath(); cx.ellipse(rx+20, ry+PH*.52, 14, 22, 0.15, 0, Math.PI*2); cx.fill();
+    // Collo
+    cx.beginPath(); cx.moveTo(rx+27,ry+PH*.28); cx.lineTo(rx+38,ry+PH*.12); cx.lineTo(rx+33,ry+PH*.3); cx.closePath(); cx.fill();
+    // Testa
+    cx.beginPath(); cx.ellipse(rx+40, ry+PH*.16, 12, 9, 0.3, 0, Math.PI*2); cx.fill();
+    // Occhio
+    cx.fillStyle = 'white'; cx.beginPath(); cx.arc(rx+45, ry+PH*.11, 4, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#111';  cx.beginPath(); cx.arc(rx+46, ry+PH*.11, 2, 0, Math.PI*2); cx.fill();
+    // Sorriso
+    cx.strokeStyle = DG; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(rx+46, ry+PH*.22, 4, 0, Math.PI); cx.stroke();
+    // Maglietta I❤TOFU
+    cx.fillStyle = '#FF6B6B'; cx.fillRect(rx+9, ry+PH*.38, 20, 15);
+    cx.fillStyle = 'white'; cx.font = 'bold 5px sans-serif'; cx.textAlign = 'center';
+    cx.fillText('I❤TOFU', rx+19, ry+PH*.38+10);
+    // Braccia
+    cx.strokeStyle = G; cx.lineWidth = 3;
+    cx.beginPath(); cx.moveTo(rx+24, ry+PH*.43); cx.lineTo(rx+37, ry+PH*.50); cx.stroke();
+    // Gambe animate
+    const lg = Math.sin(frame*0.3) * (R.jumping ? 0 : 8);
+    cx.strokeStyle = DG; cx.lineWidth = 5;
+    cx.beginPath(); cx.moveTo(rx+18, ry+PH*.82); cx.lineTo(rx+20+lg, GND); cx.stroke();
+    cx.beginPath(); cx.moveTo(rx+12, ry+PH*.82); cx.lineTo(rx+10-lg, GND); cx.stroke();
+  }
+  cx.restore();
+}
+
+// --- Sfondo ---
+function drawBg() {
+  const g = cx.createLinearGradient(0, 0, 0, GND);
+  g.addColorStop(0, '#5BA3D0'); g.addColorStop(1, '#C8E8F5');
+  cx.fillStyle = g; cx.fillRect(0, 0, 800, GND);
+
+  // Nuvole parallax
+  cx.fillStyle = 'rgba(255,255,255,0.85)';
+  const clouds = [[80,55,70],[300,40,55],[560,65,80],[160,48,65],[440,72,88]];
+  clouds.forEach(([bx, by, r], i) => {
+    const x = ((bx + bgX * (i < 3 ? 0.3 : 0.18)) % 900 + 900) % 900;
+    cx.beginPath(); cx.arc(x, by, r*0.5, 0, Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(x+r*0.3, by-r*0.2, r*0.35, 0, Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(x-r*0.28, by+r*0.05, r*0.3, 0, Math.PI*2); cx.fill();
+  });
+
+  // Prato
+  cx.fillStyle = '#4CAF50'; cx.fillRect(0, GND, 800, 400-GND);
+  cx.fillStyle = '#388E3C'; cx.fillRect(0, GND, 800, 8);
+  // Strisce sull'erba
+  cx.fillStyle = '#45a049';
+  for (let i = 0; i < 9; i++) {
+    const sx = ((frame * spd * 0.6 + i * 105) % 840) - 20;
+    cx.fillRect(sx, GND+8, 65, 5);
+  }
+}
+
+// --- HUD ---
+function drawHUD() {
+  cx.fillStyle = 'rgba(0,0,0,0.45)'; cx.fillRect(0, 0, 800, 38);
+  cx.font = '18px serif'; cx.textAlign = 'left';
+  cx.fillText('❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, 3-lives)), 8, 27);
+  cx.fillStyle = 'white'; cx.font = 'bold 16px sans-serif'; cx.textAlign = 'center';
+  cx.fillText('Livello ' + level, 400, 26);
+  cx.textAlign = 'right';
+  cx.fillText('Punti: ' + score + '  |  Best: ' + hiScore, 792, 26);
+}
+
+// --- Update ---
+function update() {
+  bgX -= 0.5;
+  if (msg) { if (--msgTimer <= 0) msg = null; }
+  if (state !== 'play') return;
+
+  // Fisica raptor
+  R.vy += GRAVITY;
+  R.y  += R.vy;
+  if (R.y >= GND - PH) { R.y = GND - PH; R.vy = 0; R.jumping = false; }
+
+  // Spawn ostacoli
+  if (--nextObj <= 0) {
+    const m = MOBS[Math.floor(Math.random() * MOBS.length)];
+    const isHigh = m[1];
+    objs.push({
+      emoji: m[0], msg: m[2], x: 820,
+      // Alto: da 245 a 305 (box 60px) — a terra: da 300 a 340 (box 40px)
+      y: isHigh ? GND-95 : GND-40, h: isHigh ? 60 : 40, w: 40
+    });
+    nextObj = Math.max(32, 90 - level*4) + Math.floor(Math.random() * 28);
+  }
+
+  // Spawn raccoglibili
+  if (--nextVeg <= 0) {
+    const v = VEGE[Math.floor(Math.random() * VEGE.length)];
+    coins.push({
+      emoji: v[0], msg: v[1], pts: v[2],
+      x: 820, y: GND - 72 - Math.random()*30, h: 35, w: 35
+    });
+    nextVeg = Math.max(45, 110 - level*4) + Math.floor(Math.random() * 38);
+  }
+
+  const ov = (a, b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+  const rb = rBox();
+
+  // Aggiorna ostacoli
+  objs = objs.filter(o => {
+    o.x -= spd;
+    if (ov(rb, o)) {
+      lives--; msg = o.msg; msgTimer = 100;
+      if (lives <= 0) {
+        state = 'gameover';
+        if (score > hiScore) { hiScore = score; localStorage.setItem('vegaRapHi', hiScore); }
+      }
+      return false;
+    }
+    return o.x > -60;
+  });
+
+  // Aggiorna raccoglibili
+  coins = coins.filter(v => {
+    v.x -= spd;
+    if (ov(rb, v)) {
+      score += v.pts; levelScore += v.pts; msg = v.msg; msgTimer = 75;
+      return false;
+    }
+    return v.x > -50;
+  });
+
+  // Punti passivi ogni 30 frame
+  if (frame % 30 === 0) { score++; levelScore++; }
+
+  // Velocità progressiva
+  spd = 3.5 + level * 0.4 + score * 0.001;
+
+  // Cambio livello
+  if (levelScore >= 200 + level * 60) {
+    state = 'lvlend'; levelTimer = 185; levelScore = 0;
+    objs = []; coins = [];
+  }
+}
+
+// --- Schermate ---
+function drawMenu() {
+  drawBg();
+  drawRaptor(355, GND-PH, false);
+
+  cx.fillStyle = 'rgba(255,255,255,0.90)';
+  rr(150, 55, 500, 235, 18); cx.fill();
+
+  cx.fillStyle = '#2d5a1b'; cx.font = 'bold 40px sans-serif'; cx.textAlign = 'center';
+  cx.fillText('🦕 VEGAN VELOCIRAPTOR', 400, 115);
+  cx.fillStyle = '#FF6B6B'; cx.font = 'bold 17px sans-serif';
+  cx.fillText('"Tofu o non essere!"', 400, 145);
+  cx.fillStyle = '#444'; cx.font = '14px sans-serif';
+  cx.fillText('⬆ / Spazio = Salta   •   ⬇ = Abbassati', 400, 174);
+  cx.fillText('Raccogli verdure, evita la carne!', 400, 196);
+  cx.fillStyle = '#666'; cx.fillText('Record: ' + hiScore, 400, 218);
+
+  if (Math.floor(frame / 22) % 2 === 0) {
+    cx.fillStyle = '#2d5a1b'; cx.font = 'bold 19px sans-serif';
+    cx.fillText('▶  PREMI SPAZIO O TOCCA PER INIZIARE  ◀', 400, 260);
+  }
+}
+
+function drawLevelEnd() {
+  drawBg();
+  const bounce = Math.abs(Math.sin(levelTimer * 0.07)) * 55;
+  drawRaptor(R.x, GND - PH - bounce, false);
+
+  cx.fillStyle = '#FFD700'; cx.strokeStyle = '#FF8C00'; cx.lineWidth = 4;
+  rr(245, 85, 310, 115, 16); cx.fill(); cx.stroke();
+  cx.fillStyle = '#1a5c0a'; cx.font = 'bold 40px sans-serif'; cx.textAlign = 'center';
+  cx.fillText('🌿 GO VEG! 🌿', 400, 146);
+  cx.fillStyle = '#444'; cx.font = 'bold 17px sans-serif';
+  cx.fillText('Livello ' + level + ' completato!', 400, 175);
+  cx.font = '15px sans-serif';
+  cx.fillText('Punti: ' + score, 400, 198);
+}
+
+function drawGameOver() {
+  drawBg();
+  drawRaptor(R.x, GND-PH, false);
+
+  cx.fillStyle = 'white'; cx.strokeStyle = '#c00'; cx.lineWidth = 3;
+  rr(75, 48, 650, 125, 16); cx.fill(); cx.stroke();
+  cx.fillStyle = '#c00'; cx.font = 'bold 18px sans-serif'; cx.textAlign = 'center';
+  cx.fillText('"Ho confuso il tofu col tufo:', 400, 93);
+  cx.fillText('ora non ho più i denti"', 400, 120);
+  cx.fillStyle = '#333'; cx.font = '16px sans-serif';
+  cx.fillText('Punti: ' + score + '   |   Record: ' + hiScore, 400, 155);
+  if (score > 0 && score >= hiScore) {
+    cx.fillStyle = '#c8860a'; cx.font = 'bold 17px sans-serif';
+    cx.fillText('🏆 NUOVO RECORD! 🏆', 400, 178);
+  }
+  btn(215, 215, 160, 47, 'Riprova', '#4CAF50');
+  btn(425, 215, 190, 47, 'Menu principale', '#2196F3');
+}
+
+// --- Loop principale ---
+function loop() {
+  requestAnimationFrame(loop);
+  frame++;
+  update();
+
+  if (state === 'menu') {
+    drawMenu();
+    return;
+  }
+
+  if (state === 'play') {
+    drawBg();
+    cx.font = '34px serif'; cx.textAlign = 'left';
+    [...objs, ...coins].forEach(o => cx.fillText(o.emoji, o.x, o.y + o.h));
+    drawRaptor(R.x, R.duck ? GND-DH : R.y, R.duck);
+    drawHUD();
+    if (msg) {
+      const alpha = Math.min(1, msgTimer / 18);
+      cx.save(); cx.globalAlpha = alpha;
+      speechBubble(R.x + 55, rTop() - 60, msg, msg.startsWith('NOOO') ? '#c00' : '#1a7a0f');
+      cx.restore();
+    }
+    return;
+  }
+
+  if (state === 'lvlend') {
+    if (--levelTimer <= 0) { level++; state = 'play'; nextObj = 80; nextVeg = 70; }
+    drawLevelEnd();
+    drawHUD();
+    return;
+  }
+
+  if (state === 'gameover') {
+    drawGameOver();
+    return;
+  }
+}
+
+loop();
+</script>
+</body>
+</html>
