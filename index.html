@@ -56,8 +56,8 @@ const VVAudio = (() => {
   let muted = false, themeTimer = null, themeActive = false, _bpm = 165;
 
   const N = {
-    Bb2:116.54,
-    C3:130.81, Db3:138.59, Eb3:155.56, F3:174.61, Gb3:185.00,
+    Bb2:116.54, B2:123.47,
+    C3:130.81, Db3:138.59, D3:146.83, Eb3:155.56, E3:164.81, F3:174.61, Gb3:185.00,
     G3:196.00, Ab3:207.65, A3:220.00, Bb3:233.08, B3:246.94,
     C4:261.63, Db4:277.18, D4:293.66, Eb4:311.13, E4:329.63,
     F4:349.23, G4:392.00, Ab4:415.30, A4:440.00, Bb4:466.16, B4:493.88,
@@ -90,15 +90,25 @@ const VVAudio = (() => {
     return tot;
   }
 
+  // Vegan Velociraptor – Nanowar of Steel (chiptune 8-bit power metal, E minor)
   const MEL = [
-    [N.C5,1],[N.E5,1],[N.G5,2],[N.A5,1],[N.G5,1],[N.F5,2],
-    [N.E5,1],[N.G5,1],[N.C5,2],[N.D5,1],[N.F5,1],[N.G5,2],
-    [N.C6,2],[N.Bb5,2],[N.A5,1],[N.G5,1],[N.F5,2],
-    [N.E5,1],[N.D5,1],[N.E5,1],[N.F5,1],[N.C5,4],
+    // Riff A – gallop principale (4+4+4+4 = 16 beat)
+    [N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],
+    [N.G5,1],[N.E5,0.5],[N.D5,0.5],[N.B4,1],[N.A4,1],
+    [N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],
+    [N.D5,2],[N.B4,2],
+    // Riff B – chorus / lift (4+4+4+4 = 16 beat)
+    [N.A5,0.5],[N.G5,0.5],[N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.D5,0.5],[N.E5,0.5],[N.G5,0.5],
+    [N.A5,1],[N.G5,1],[N.E5,2],
+    [N.A5,0.5],[N.G5,0.5],[N.E5,0.5],[N.D5,0.5],[N.B4,0.5],[N.A4,0.5],[N.G4,0.5],[N.E4,0.5],
+    [N.E5,4],
   ];
   const BAS = [
-    [N.C3,2],[N.C3,2],[N.F3,2],[N.G3,2],[N.C3,2],[N.G3,2],[N.G3,4],
-    [N.Ab3,2],[N.Bb3,2],[N.F3,2],[N.F3,2],[N.G3,2],[N.G3,2],[N.C3,4],
+    // bass in E minor (32 beat, aligned con MEL)
+    [N.E3,2],[N.E3,2], [N.D3,2],[N.D3,2],
+    [N.A3,2],[N.A3,2], [N.B3,2],[N.B3,2],
+    [N.A3,2],[N.A3,2], [N.G3,2],[N.G3,2],
+    [N.A3,2],[N.A3,2], [N.E3,4],
   ];
 
   function _schedLoop() {
@@ -207,6 +217,18 @@ const VVAudio = (() => {
     [N.C3,N.G3,N.E3,N.C3].forEach((f,i)=>_tone(f,t0+i*1.2,1.1,0.12,'triangle'));
   }
 
+  function bonusArmageddon() {
+    if(muted) return; stopTheme();
+    const a=_ac(),t=a.currentTime;
+    // Stab apocalittici discendenti
+    [N.Bb3,N.Ab3,N.Gb3,N.Eb3].forEach((f,i)=>{
+      _tone(f,t+i*0.19,0.42,0.22,'sawtooth');
+      _tone(f*2,t+i*0.19,0.3,0.11,'square');
+    });
+    _tone(N.Bb2,t,0.9,0.25,'sawtooth');
+    setTimeout(()=>{_bpm=Math.max(185,_bpm+18);startTheme();},1000);
+  }
+
   function toggleMute() {
     muted=!muted;
     if(_master) _master.gain.value=muted?0:0.28;
@@ -214,7 +236,7 @@ const VVAudio = (() => {
     return muted;
   }
   return { startTheme,stopTheme,setBPM,vegJingle,lifeLost,seitanPowerUp,victory,
-           funeralMarch,trexRoar,trexFlee,loveTheme,finalVictory,toggleMute };
+           funeralMarch,trexRoar,trexFlee,loveTheme,finalVictory,bonusArmageddon,toggleMute };
 })();
 
 document.getElementById('mute-btn').addEventListener('click', e => {
@@ -223,7 +245,7 @@ document.getElementById('mute-btn').addEventListener('click', e => {
 });
 
 // --- Stato gioco ---
-// states: menu | play | boss | lvlend | gameover | finalBoss | victory
+// states: menu | play | boss | lvlend | gameover | finalBoss | victory | bonus
 let state = 'menu';
 let score, lives, level, spd, spdMod, frame, levelScore, levelTimer;
 let hiScore = +localStorage.getItem('vegaRapHi') || 0;
@@ -235,6 +257,7 @@ const QUIPS = ['Il tofu mi dà la forza!','Abbasso il capitalismo carnivoro!',
 let quip = null, quipTimer = 0, nextQuip = 350;
 let boss = null;
 let fb = null;  // final boss
+let bonus = null; // bonus stage
 
 // --- Raptor ---
 const R = { x:100, y:GND-PH, vy:0, jumping:false, duck:false, jumps:0 };
@@ -255,7 +278,7 @@ const VEGE = [
 
 // --- Input ---
 function doJump() {
-  if (state!=='play' && state!=='boss' && state!=='finalBoss') return;
+  if (state!=='play' && state!=='boss' && state!=='finalBoss' && state!=='bonus') return;
   if (R.jumps < 2) {
     R.vy = R.jumps===0 ? JUMP_VY : JUMP_VY*0.82;
     R.jumping = true; R.jumps++;
@@ -270,12 +293,12 @@ function startGame() {
   nextObj=80; nextVeg=70; nextSeitan=500;
   seitanActive=false; seitanTimer=0;
   quip=null; quipTimer=0; nextQuip=350;
-  boss=null; fb=null;
+  boss=null; fb=null; bonus=null;
   VVAudio.setBPM(SPD_MIN); VVAudio.startTheme();
 }
 
 window.addEventListener('keydown', e => {
-  if (state==='play'||state==='boss'||state==='finalBoss') {
+  if (state==='play'||state==='boss'||state==='finalBoss'||state==='bonus') {
     if (e.code==='ArrowUp'||e.code==='Space'){e.preventDefault();doJump();}
     if (e.code==='ArrowDown'){e.preventDefault();R.duck=true;}
   } else if (e.code==='Enter'||e.code==='Space') {
@@ -288,7 +311,7 @@ window.addEventListener('keyup', e => { if (e.code==='ArrowDown') R.duck=false; 
 c.addEventListener('touchstart', e => {
   e.preventDefault();
   const t = e.touches[0];
-  if (state==='play'||state==='boss'||state==='finalBoss') {
+  if (state==='play'||state==='boss'||state==='finalBoss'||state==='bonus') {
     const rect=c.getBoundingClientRect();
     if (t.clientY < rect.top+rect.height/2) doJump(); else R.duck=true;
   } else if (state==='gameover') {
@@ -481,6 +504,143 @@ function drawBg() {
   for(let i=0;i<9;i++){const sx=((frame*(spd||4)*0.6+i*105)%840)-20;cx.fillRect(sx,GND+8,65,5);}
 }
 
+// --- Sfondo Bonus Armageddon ---
+function drawBonusBg() {
+  const g=cx.createLinearGradient(0,0,0,GND);
+  g.addColorStop(0,'#0d0000');g.addColorStop(0.35,'#550000');
+  g.addColorStop(0.7,'#aa2200');g.addColorStop(1,'#dd5500');
+  cx.fillStyle=g;cx.fillRect(0,0,800,GND);
+  // Fiamme in cima
+  for(let i=0;i<14;i++){
+    const fx=(i*62+frame*0.8)%868;
+    const fh=28+Math.sin(frame*0.14+i*0.7)*16;
+    const fg=cx.createLinearGradient(fx,0,fx,fh+10);
+    fg.addColorStop(0,'rgba(255,200,0,0.95)');fg.addColorStop(0.5,'rgba(255,60,0,0.7)');fg.addColorStop(1,'rgba(255,0,0,0)');
+    cx.fillStyle=fg;
+    cx.beginPath();cx.moveTo(fx,fh+10);cx.quadraticCurveTo(fx+22,0,fx+44,fh+10);cx.fill();
+  }
+  // Braci volanti
+  for(let i=0;i<25;i++){
+    const ex=((i*51+frame*(1.2+i*0.08))%820);
+    const ey=((i*43+frame*(0.9+i*0.06))%(GND-30));
+    cx.fillStyle=`hsl(${20+i*7},100%,${55+i%4*10}%)`;
+    cx.beginPath();cx.arc(ex,ey,1+i%3,0,Math.PI*2);cx.fill();
+  }
+  // Terreno bruciato
+  cx.fillStyle='#1a0600';cx.fillRect(0,GND,800,400-GND);
+  cx.fillStyle='#331100';cx.fillRect(0,GND,800,5);
+  // Crepacci di lava
+  for(let i=0;i<6;i++){
+    const lx=(i*145+62)%800;
+    cx.strokeStyle='#ff3300';cx.lineWidth=1.5;cx.globalAlpha=0.45;
+    cx.beginPath();cx.moveTo(lx,GND);cx.lineTo(lx+10,GND+8);cx.lineTo(lx+3,GND+20);cx.stroke();
+    cx.globalAlpha=1;
+  }
+}
+
+// --- Bonus Stage update ---
+function updateBonus() {
+  if(!bonus) return;
+  if(bonus.survived){
+    if(--bonus.endTimer<=0){
+      level++;spd=SPD_MIN+level*0.4;spdMod=0;
+      objs=[];coins=[];bonus=null;seitanActive=false;seitanTimer=0;
+      nextObj=80;nextVeg=70;nextSeitan=500;
+      quip=null;quipTimer=0;nextQuip=350;
+      boss=null;levelScore=0;frame=0;
+      state='play';
+      VVAudio.setBPM(spd);VVAudio.startTheme();
+    }
+    return;
+  }
+  if(--bonus.timer<=0){
+    bonus.survived=true;bonus.endTimer=240;
+    msg='I dinosauri si sono estinti perché mangiavano carne! Io no!';msgTimer=230;
+    VVAudio.victory();
+    return;
+  }
+  // Spawn seitan
+  if(--nextSeitan<=0&&!seitanActive){
+    coins.push({emoji:'🌾',msg:'BESTIA DI SEITAN!!!',pts:30,x:820,y:GND-85,h:45,w:45,isSeitan:true});
+    nextSeitan=600+Math.floor(Math.random()*400);
+  }
+  // Muovi seitan orizzontalmente
+  const rb=rBox();
+  coins=coins.filter(v=>{
+    v.x-=spd;
+    if(ov(rb,v)){
+      if(v.isSeitan){
+        seitanActive=true;seitanTimer=SEITAN_DUR;score+=v.pts;
+        msg='Ora sono un super veg-velociraptor: una BESTIA DI SEITAN!';msgTimer=230;VVAudio.seitanPowerUp();
+      }
+      return false;
+    }
+    return v.x>-50;
+  });
+  // Spawn meteore
+  const intensity=Math.floor((2700-bonus.timer)/300);
+  if(--bonus.nextMeteor<=0){
+    bonus.meteors.push({
+      x:40+Math.random()*720,y:-40,
+      vy:3.5+Math.random()*2.8+intensity*0.35,
+      vx:(Math.random()-0.5)*2.4,
+      size:34+Math.random()*24,
+      angle:Math.random()*Math.PI*2,
+      spin:(Math.random()-0.5)*0.18
+    });
+    bonus.nextMeteor=Math.max(16,52-intensity*5)+Math.floor(Math.random()*24);
+  }
+  // Aggiorna meteore + collisioni
+  bonus.meteors=bonus.meteors.filter(m=>{
+    m.y+=m.vy;m.x+=m.vx;m.angle+=m.spin;
+    if(m.y>GND+20)return false;
+    const hitBox={x:m.x-m.size*0.28,y:m.y-m.size*0.42,w:m.size*0.56,h:m.size*0.52};
+    if(!seitanActive&&ov(rb,hitBox)){
+      lives--;msg='COLPITO DA UNA POLPETTA COSMICA!';msgTimer=110;VVAudio.lifeLost();
+      if(lives<=0){
+        state='gameover';bonus=null;
+        if(score>hiScore){hiScore=score;localStorage.setItem('vegaRapHi',hiScore);}
+        VVAudio.funeralMarch();
+      }
+      return false;
+    }
+    return true;
+  });
+  if(frame%30===0)score++;
+  spd=SPD_MIN+level*0.4+spdMod;
+  if(frame%60===0)VVAudio.setBPM(spd);
+}
+
+// --- Disegna Bonus Stage ---
+function drawBonusStage() {
+  drawBonusBg();drawTouchZones();
+  // Seitan
+  coins.forEach(v=>{
+    if(v.isSeitan){cx.save();cx.shadowColor='#cc88ff';cx.shadowBlur=14+Math.sin(frame*0.2)*6;
+      cx.font='38px serif';cx.textAlign='left';cx.fillText(v.emoji,v.x,v.y+v.h);cx.restore();}
+  });
+  // Meteore polpette
+  bonus.meteors.forEach(m=>{
+    cx.save();cx.translate(m.x,m.y);cx.rotate(m.angle);
+    cx.shadowColor='#ff5500';cx.shadowBlur=22+Math.sin(frame*0.2)*8;
+    cx.font=`${Math.round(m.size)}px serif`;cx.textAlign='center';cx.fillText('🍖',0,0);
+    cx.restore();
+  });
+  // Banner armageddon
+  cx.fillStyle='rgba(130,0,0,0.88)';rr(50,43,700,40,10);cx.fill();
+  cx.strokeStyle='#ff5500';cx.lineWidth=2;rr(50,43,700,40,10);cx.stroke();
+  const ts=bonus.survived?0:Math.ceil(bonus.timer/60);
+  cx.fillStyle=bonus.survived?'#88ff88':'#ffcc00';
+  cx.font='bold 13px sans-serif';cx.textAlign='center';
+  cx.fillText(
+    bonus.survived
+      ?"🌿 I dinosauri si estinsero perché mangiavano carne! Io no! 🌿"
+      :`🔥 BONUS STAGE: SOPRAVVIVI ALL'ARMAGEDDON! 🔥   ⏱ ${ts}s`,
+    400,69);
+  drawRaptor(R.x,R.duck?GND-DH:R.y,R.duck);
+  drawHUD();drawGameBubbles();
+}
+
 // --- HUD ---
 function drawHUD() {
   cx.fillStyle='rgba(0,0,0,0.45)';cx.fillRect(0,0,800,38);
@@ -499,6 +659,10 @@ function drawHUD() {
     else if (fb.phase==='intro') cx.fillText('🦖 IL T-REX CARNIVORO ARRIVA!!!',400,26);
     else if (fb.phase==='flee') cx.fillText('🏃 IL T-REX FUGGE!!! 🌿',400,26);
     else if (fb.phase==='freed'||fb.phase==='romance') {cx.fillStyle='#ff69b4';cx.fillText('💕 GO VEG! ❤️ 💕',400,26);}
+  } else if (state==='bonus'&&bonus) {
+    const ts=bonus.survived?0:Math.ceil(bonus.timer/60);
+    cx.fillStyle=bonus.survived?'#44ff44':'#ff4400';
+    cx.fillText(bonus.survived?'🌿 SOPRAVVISSUTO! VEGAN POWER! 🌿':`🔥 ARMAGEDDON: ${ts}s rimasti 🔥`,400,26);
   } else {
     cx.fillStyle='white';
     const spdBar=spdMod>0?' 🔥'.repeat(Math.min(3,Math.ceil(spdMod/0.5))):'  ✅';
@@ -734,12 +898,13 @@ function update() {
   if(msg&&--msgTimer<=0) msg=null;
   if(quip&&--quipTimer<=0) quip=null;
 
-  if(state==='play'||state==='boss'||state==='finalBoss'){
+  if(state==='play'||state==='boss'||state==='finalBoss'||state==='bonus'){
     R.vy+=GRAVITY; R.y+=R.vy;
     if(R.y>=GND-PH){R.y=GND-PH;R.vy=0;R.jumping=false;R.jumps=0;}
     if(seitanActive&&--seitanTimer<=0){seitanActive=false;msg='Il potere del seitan è finito...';msgTimer=70;}
   }
 
+  if(state==='bonus'){updateBonus();return;}
   if(state==='finalBoss'){updateFinalBoss();return;}
 
   if(state==='boss'){
@@ -825,14 +990,13 @@ function update() {
 
   if(levelScore>=200+level*60){
     objs=[];coins=[];
-    if(level>=MAX_LEVEL){
-      // BOSS FINALE T-REX!
-      state='finalBoss';
-      fb={phase:'intro',trexX:920,trexVX:0,gfX:720,gfVX:0,
-          steaks:[],steaksDodged:0,totalSteaks:8,nextSteak:120,
-          hitCooldown:60,phaseTimer:0,hearts:[]};
-      msg='⚠️ IL T-REX CARNIVORO HA RAPITO LA TUA FIDANZATA!!!';msgTimer=200;
-      VVAudio.stopTheme();
+    if(level%5===0){
+      // BONUS STAGE ogni 5 livelli!
+      state='bonus';
+      bonus={timer:2700,meteors:[],nextMeteor:55,survived:false,endTimer:0};
+      levelScore=0;
+      msg='🔥 ARMAGEDDON IN ARRIVO!!! 🔥';msgTimer=160;
+      VVAudio.bonusArmageddon();
     } else {
       state='boss';
       boss={x:900,phase:0,passCount:0,spd:spd+1.5,hitCooldown:60};
@@ -852,12 +1016,14 @@ function drawMenu() {
   cx.fillText(window._hasTouched?'👆 Tap su = Salta (x2 doppio)  •  👇 Tap giù = Abbassati':'⬆ Spazio = Salta (x2 doppio)  •  ⬇ = Abbassati',400,157);
   cx.fillText('Raccogli verdure, evita la carne!',400,178);
   cx.fillStyle='#6a1fc2';cx.font='bold 13px sans-serif';cx.fillText('🌾 SEITAN = invincibile! 🥩 Boss di livello! 🦖 Boss finale!',400,200);
-  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🦖 Lvl '+MAX_LEVEL+': T-Rex carnivoro boss finale — salva la fidanzata! 💕',400,221);
+  cx.fillStyle='#a00';cx.font='bold 13px sans-serif';cx.fillText('🔥 Ogni 5 livelli: BONUS STAGE — Armageddon delle Polpette! Loop infinito! 🍖',400,221);
   cx.fillStyle='#666';cx.font='14px sans-serif';cx.fillText('Record: '+hiScore,400,244);
   if(Math.floor(frame/22)%2===0){
     cx.fillStyle='#2d5a1b';cx.font='bold 19px sans-serif';
     cx.fillText(window._hasTouched?'▶  TOCCA PER INIZIARE  ◀':'▶  PREMI SPAZIO PER INIZIARE  ◀',400,275);
   }
+  cx.fillStyle='#999';cx.font='11px sans-serif';cx.textAlign='center';
+  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,300);
 }
 function drawLevelEnd() {
   drawBg();
@@ -876,6 +1042,8 @@ function drawGameOver() {
   if(score>0&&score>=hiScore){cx.fillStyle='#c8860a';cx.font='bold 17px sans-serif';cx.fillText('🏆 NUOVO RECORD! 🏆',400,178);}
   btn(215,215,160,47,'Riprova','#4CAF50');
   btn(425,215,190,47,'Menu principale','#2196F3');
+  cx.fillStyle='#888';cx.font='11px sans-serif';cx.textAlign='center';
+  cx.fillText('Gioco sviluppato da Antonio Moliterni (Ananasso Malvagio)',400,285);
 }
 
 // --- Loop ---
@@ -896,6 +1064,7 @@ function loop() {
     drawBg();drawTouchZones();drawBoss();
     drawRaptor(R.x,R.duck?GND-DH:R.y,R.duck);drawHUD();drawGameBubbles();return;
   }
+  if(state==='bonus'){drawBonusStage();return;}
   if(state==='finalBoss'){drawFinalBossScene();return;}
   if(state==='lvlend'){
     if(--levelTimer<=0){level++;state='play';nextObj=80;nextVeg=70;}
