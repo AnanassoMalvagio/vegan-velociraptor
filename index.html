@@ -14,6 +14,14 @@ canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; }
   font:bold 20px sans-serif; flex-direction:column; align-items:center;
   justify-content:center; text-align:center; gap:16px; z-index:99; }
 @media (orientation:portrait) and (max-width:768px) { #rot { display:flex; } }
+#mute-btn {
+  position:fixed; top:10px; right:14px; z-index:200;
+  background:rgba(0,0,0,0.55); color:white; border:1.5px solid rgba(255,255,255,0.5);
+  border-radius:8px; padding:5px 12px; font-size:18px; cursor:pointer;
+  font-family:sans-serif; line-height:1; user-select:none;
+  transition: background 0.15s;
+}
+#mute-btn:hover { background:rgba(0,0,0,0.8); }
 </style>
 </head>
 <body>
@@ -22,6 +30,7 @@ canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; }
   <div>Ruota il telefono<br>per giocare!</div>
 </div>
 <canvas id="c"></canvas>
+<button id="mute-btn" title="Mute/Unmute">🔊</button>
 <script>
 const c = document.getElementById('c'), cx = c.getContext('2d');
 c.width = 800; c.height = 400;
@@ -55,6 +64,184 @@ let hiScore = +localStorage.getItem('vegaRapHi') || 0;
 let objs = [], coins = [], msg = null, msgTimer = 0;
 let bgX = 0;
 let nextObj, nextVeg;
+
+// ===== 🎵 8-BIT AUDIO ENGINE =====
+const VVAudio = (() => {
+  let _ctx = null, _master = null;
+  let muted = false, themeTimer = null, themeActive = false, _bpm = 165;
+
+  const N = {
+    Bb2:116.54,
+    C3:130.81, Db3:138.59, Eb3:155.56, F3:174.61, Gb3:185.00,
+    G3:196.00,  Ab3:207.65, A3:220.00,  Bb3:233.08, B3:246.94,
+    C4:261.63,  Db4:277.18, D4:293.66,  Eb4:311.13, E4:329.63,
+    F4:349.23,  G4:392.00,  Ab4:415.30, A4:440.00,  Bb4:466.16, B4:493.88,
+    C5:523.25,  D5:587.33,  E5:659.25,  F5:698.46,
+    G5:783.99,  A5:880.00,  Bb5:932.33, C6:1046.50,
+    R:0
+  };
+
+  function _ac() {
+    if (!_ctx) {
+      _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      _master = _ctx.createGain();
+      _master.gain.value = muted ? 0 : 0.28;
+      _master.connect(_ctx.destination);
+    }
+    if (_ctx.state === 'suspended') _ctx.resume();
+    return _ctx;
+  }
+
+  function _tone(f, t, dur, vol, wave) {
+    if (!f) return;
+    const a = _ac();
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = wave || 'square';
+    o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, Math.max(t + 0.001, t + dur * 0.9));
+    o.connect(g); g.connect(_master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // Schedule sequence, returns total duration in seconds.
+  // beatLen=1 → durations are already in seconds; beatLen=60/bpm → beats
+  function _seq(notes, t0, beatLen, vol, wave) {
+    let t = t0, total = 0;
+    for (const [f, b] of notes) {
+      const d = b * beatLen;
+      _tone(f, t, d * 0.88, vol, wave);
+      t += d; total += d;
+    }
+    return total;
+  }
+
+  // --- Main theme: frantic 8-bit chiptune originale (C major, 32 beats) ---
+  const MEL = [
+    [N.C5,1],[N.E5,1],[N.G5,2],
+    [N.A5,1],[N.G5,1],[N.F5,2],
+    [N.E5,1],[N.G5,1],[N.C5,2],
+    [N.D5,1],[N.F5,1],[N.G5,2],
+    [N.C6,2],[N.Bb5,2],
+    [N.A5,1],[N.G5,1],[N.F5,2],
+    [N.E5,1],[N.D5,1],[N.E5,1],[N.F5,1],
+    [N.C5,4],
+  ];
+  const BAS = [
+    [N.C3,2],[N.C3,2],[N.F3,2],[N.G3,2],
+    [N.C3,2],[N.G3,2],[N.G3,4],
+    [N.Ab3,2],[N.Bb3,2],[N.F3,2],[N.F3,2],
+    [N.G3,2],[N.G3,2],[N.C3,4],
+  ];
+
+  function _schedLoop() {
+    if (!themeActive || muted) return;
+    const a = _ac();
+    const bd = 60 / _bpm;
+    const t0 = a.currentTime + 0.04;
+    const dur = _seq(MEL, t0, bd, 0.17, 'square');
+    _seq(BAS, t0, bd, 0.09, 'triangle');
+    themeTimer = setTimeout(_schedLoop, (dur - 0.06) * 1000);
+  }
+
+  function startTheme() {
+    stopTheme();
+    themeActive = true;
+    _schedLoop();
+  }
+
+  function stopTheme() {
+    themeActive = false;
+    if (themeTimer) { clearTimeout(themeTimer); themeTimer = null; }
+  }
+
+  // BPM scala con velocità di gioco: 3.5→165, 6→190, 9→220
+  function setBPM(gameSpd) {
+    _bpm = Math.max(165, Math.min(260, 130 + gameSpd * 10));
+  }
+
+  // --- Jingle verdura: arpeggio ascendente allegro ---
+  function vegJingle() {
+    if (muted) return;
+    const a = _ac(), t = a.currentTime;
+    [[N.C5,0],[N.E5,0.07],[N.G5,0.14],[N.C6,0.21]].forEach(([f, dt]) =>
+      _tone(f, t + dt, 0.15, 0.22, 'square'));
+    _tone(N.C6 * 1.5, t + 0.32, 0.09, 0.07, 'sine');
+  }
+
+  // --- Vita persa: discesa cromatica drammatica ---
+  function lifeLost() {
+    if (muted) return;
+    const a = _ac(), t = a.currentTime;
+    [N.B4, N.Bb4, N.A4, N.Ab4, N.G4, N.F4, N.E4, N.Eb4]
+      .forEach((f, i) => _tone(f, t + i * 0.075, 0.11, 0.17, 'sawtooth'));
+    _tone(N.Bb2, t + 0.6, 0.55, 0.28, 'square');
+  }
+
+  // --- Game Over: Marcia Funebre Chopin Op.35 in 8-bit (Bb minore) ---
+  function funeralMarch() {
+    if (muted) return;
+    stopTheme();
+    const a = _ac(), t0 = a.currentTime + 0.5;
+    const q = 60 / 60;           // quarto a 60 BPM = 1 secondo
+    const e = q / 2, h = q * 2, dq = q * 1.5;
+
+    // Melodia principale
+    const mel = [
+      [N.Bb3, e],                                               // pickup
+      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,dq],[N.R,e],        // frase 1
+      [N.Eb3,e],[N.Eb3,e],[N.Bb2,q],[N.Ab3,dq],[N.R,e],       // frase 2
+      [N.Ab3,e],[N.Ab3,e],[N.Eb3,q],[N.Db3,dq],[N.R,e],       // frase 3
+      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,h],[N.R,q],         // frase 4 (cadenza)
+      // Trio (più luminoso, Db maggiore)
+      [N.Eb4,dq],[N.F4,e],[N.Eb4,q],[N.Db4,q],
+      [N.Bb3,h],[N.Eb4,q],[N.R,q],
+      [N.Db4,dq],[N.Eb4,e],[N.Db4,q],[N.Bb3,q],
+      [N.Ab3,h+q],[N.R,q],
+      // Da Capo
+      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,dq],[N.R,e],
+      [N.Eb3,e],[N.Eb3,e],[N.Bb2,q],[N.Ab3,dq],[N.R,e],
+      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,h+q],
+    ];
+
+    // Basso / accompagnamento
+    const bas = [
+      [N.R, e],
+      [N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,q],
+      [N.Eb3,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],
+      [N.Ab3,q],[N.Ab3,q],[N.Ab3,q],[N.Ab3,q],
+      [N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,h+q],
+      // Trio basso
+      [N.Ab3,q],[N.Ab3,q],[N.Gb3,q],[N.Gb3,q],
+      [N.Eb3,q],[N.Eb3,q],[N.F3,q],[N.R,q],
+      [N.Db3,q],[N.Db3,q],[N.Eb3,q],[N.Eb3,q],
+      [N.Ab3,q],[N.Ab3,q],[N.R,h+q],
+      // Da Capo basso
+      [N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,q],
+      [N.Eb3,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],
+      [N.Bb2,q],[N.Bb2,q],[N.Bb2,h+q],
+    ];
+
+    _seq(mel, t0, 1, 0.22, 'square');
+    _seq(bas, t0, 1, 0.11, 'triangle');
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    if (_master) _master.gain.value = muted ? 0 : 0.28;
+    if (muted) stopTheme();
+    return muted;
+  }
+
+  return { startTheme, stopTheme, setBPM, vegJingle, lifeLost, funeralMarch, toggleMute };
+})();
+
+// Pulsante muto
+document.getElementById('mute-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  const m = VVAudio.toggleMute();
+  e.currentTarget.textContent = m ? '🔇' : '🔊';
+});
 
 // --- Raptor ---
 const R = { x:100, y:GND-PH, vy:0, jumping:false, duck:false };
@@ -94,6 +281,8 @@ function startGame() {
   objs = []; coins = []; msg = null; msgTimer = 0;
   R.y = GND-PH; R.vy = 0; R.jumping = false; R.duck = false;
   nextObj = 80; nextVeg = 70;
+  VVAudio.setBPM(SPD_MIN);
+  VVAudio.startTheme();
 }
 
 window.addEventListener('keydown', e => {
@@ -123,7 +312,7 @@ function handleClick(cx_, cy_) {
   const mx = (cx_ - rect.left) * (c.width  / rect.width);
   const my = (cy_ - rect.top)  * (c.height / rect.height);
   if (mx>215 && mx<375 && my>215 && my<262) startGame();
-  if (mx>425 && mx<615 && my>215 && my<262) { state = 'menu'; frame = 0; }
+  if (mx>425 && mx<615 && my>215 && my<262) { state = 'menu'; frame = 0; VVAudio.stopTheme(); }
 }
 
 // --- Helpers canvas ---
@@ -311,9 +500,11 @@ function update() {
       lives--;
       spdMod += 0.5;   // più veloce ad ogni vita persa
       msg = o.msg; msgTimer = 100;
+      VVAudio.lifeLost();
       if (lives <= 0) {
         state = 'gameover';
         if (score > hiScore) { hiScore = score; localStorage.setItem('vegaRapHi', hiScore); }
+        VVAudio.funeralMarch();
       }
       return false;
     }
@@ -328,6 +519,7 @@ function update() {
       lives = Math.min(MAX_LIVES, lives + 1);  // vita extra (max 5)
       spdMod = Math.max(0, spdMod - 0.3);      // rallenta (non scende sotto SPD_MIN)
       msg = v.msg + ' +❤️'; msgTimer = 75;
+      VVAudio.vegJingle();
       return false;
     }
     return v.x > -50;
@@ -338,6 +530,9 @@ function update() {
 
   // Velocità: base per livello + penalità accumulate - bonus verdure (mai sotto SPD_MIN)
   spd = SPD_MIN + level * 0.4 + spdMod;
+
+  // Aggiorna BPM del tema con la velocità corrente (ogni 60 frame)
+  if (frame % 60 === 0) VVAudio.setBPM(spd);
 
   // Cambio livello
   if (levelScore >= 200 + level * 60) {
@@ -395,6 +590,7 @@ function drawGameOver() {
 
   cx.fillStyle = 'white'; cx.strokeStyle = '#c00'; cx.lineWidth = 3;
   rr(75, 48, 650, 125, 16); cx.fill(); cx.stroke();
+  // Fumetto parlante
   cx.fillStyle = '#c00'; cx.font = 'bold 18px sans-serif'; cx.textAlign = 'center';
   cx.fillText('"Ho confuso il tofu col tufo:', 400, 93);
   cx.fillText('ora non ho più i denti"', 400, 120);
