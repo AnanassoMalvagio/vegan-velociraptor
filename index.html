@@ -207,14 +207,22 @@ const VVAudio = (() => {
     [N.C3,N.G3,N.E3,N.C3].forEach((f,i)=>_tone(f,t0+i*1.2,1.1,0.12,'triangle'));
   }
 
+  // Tema frenetico per la Bonus Stage (BPM fisso alto)
+  function startBonusTheme() {
+    stopTheme();
+    themeActive=true; _bpm=252;
+    _schedLoop();
+  }
+
   function toggleMute() {
     muted=!muted;
     if(_master) _master.gain.value=muted?0:0.28;
     if(muted) stopTheme();
     return muted;
   }
-  return { startTheme,stopTheme,setBPM,vegJingle,lifeLost,seitanPowerUp,victory,
-           funeralMarch,trexRoar,trexFlee,loveTheme,finalVictory,toggleMute };
+  return { startTheme,stopTheme,startBonusTheme,setBPM,vegJingle,lifeLost,
+           seitanPowerUp,victory,funeralMarch,trexRoar,trexFlee,loveTheme,
+           finalVictory,toggleMute };
 })();
 
 document.getElementById('mute-btn').addEventListener('click', e => {
@@ -265,7 +273,7 @@ function doJump() {
 }
 
 function startGame() {
-  state='play'; score=0; lives=3; level=1; spd=SPD_MIN; spdMod=0;
+  state='play'; score=0; lives=5; level=1; spd=SPD_MIN; spdMod=0;
   frame=0; levelScore=0; levelTimer=0;
   objs=[]; coins=[]; msg=null; msgTimer=0;
   R.x=100; R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
@@ -847,8 +855,8 @@ function update() {
         seitanActive=true;seitanTimer=SEITAN_DUR;score+=v.pts;levelScore+=v.pts;
         msg='Ora sono un super veg-velociraptor: una BESTIA DI SEITAN!';msgTimer=230;VVAudio.seitanPowerUp();
       } else {
-        score+=v.pts;levelScore+=v.pts;lives=Math.min(MAX_LIVES,lives+1);
-        spdMod=Math.max(0,spdMod-0.3);msg=v.msg+' +❤️';msgTimer=75;VVAudio.vegJingle();
+        score+=v.pts;levelScore+=v.pts;
+        spdMod=Math.max(0,spdMod-0.3);msg=v.msg;msgTimer=75;VVAudio.vegJingle();
       }
       return false;
     }
@@ -866,7 +874,7 @@ function update() {
       bs={timer:660, meatballs:[], nextMeat:60, dodged:0};
       R.x=100; R.movingLeft=false; R.movingRight=false;
       msg='⭐ BONUS STAGE! Schiva le polpette! ← → per muoverti!';msgTimer=220;
-      VVAudio.victory();
+      VVAudio.startBonusTheme();
     } else {
       state='boss';
       boss={x:900,phase:0,passCount:0,spd:spd+1.5,hitCooldown:60};
@@ -1067,13 +1075,13 @@ function loop() {
   if(state==='bonusStage'){drawBonusStage();return;}
   if(state==='finalBoss'){drawFinalBossScene();return;}
   if(state==='lvlend'){
-    if(--levelTimer<=0){level++;state='play';nextObj=80;nextVeg=70;}
+    if(--levelTimer<=0){level++;lives=5;state='play';nextObj=80;nextVeg=70;}
     drawLevelEnd();drawHUD();return;
   }
   if(state==='loopEnd'){
     if(--levelTimer<=0){
       // Riparti dal livello 1 con difficoltà aumentata
-      level=1; spdMod=loopCount*1.3; levelScore=0; levelTimer=0;
+      level=1; lives=5; spdMod=loopCount*1.3; levelScore=0; levelTimer=0;
       objs=[]; coins=[]; boss=null; fb=null; bs=null;
       nextObj=80; nextVeg=70; nextSeitan=500;
       seitanActive=false; seitanTimer=0;
