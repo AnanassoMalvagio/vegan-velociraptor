@@ -129,9 +129,54 @@ const VVAudio = (() => {
   }
   function seitanPowerUp() {
     if (muted) return;
-    const a=_ac(),t=a.currentTime;
-    [N.C4,N.E4,N.G4,N.C5,N.E5,N.G5,N.C6].forEach((f,i)=>_tone(f,t+i*0.07,0.45-i*0.04,0.2,'square'));
-    _tone(N.C3,t,0.6,0.14,'triangle'); _tone(N.G3,t+0.1,0.5,0.10,'triangle');
+    const a=_ac(), t=a.currentTime;
+
+    // Helper locale: overdrive WaveShaper (suono metal distorto)
+    function _dist(f,st,dur,vol) {
+      const o=a.createOscillator(),ws=a.createWaveShaper(),g=a.createGain();
+      const K=128,cv=new Float32Array(K*2+1);
+      for(let i=0;i<=K*2;i++){const x=i/K-1;cv[i]=x<0?-(1-Math.exp(x*5))*0.85:(1-Math.exp(-x*5))*0.85;}
+      ws.curve=cv; o.type='sawtooth'; o.frequency.value=f;
+      g.gain.setValueAtTime(vol,st);
+      g.gain.exponentialRampToValueAtTime(0.0001,Math.max(st+0.001,st+dur*0.85));
+      o.connect(ws);ws.connect(g);g.connect(_master);
+      o.start(st);o.stop(st+dur+0.05);
+    }
+
+    // === 1. BASS BOMB + POWER CHORD (t=0) ===
+    _dist(65.41, t,      0.28, 0.30);   // C2 — botta
+    _dist(65.41*1.5,t+0.02,0.22,0.18); // G2 — quinta
+    _dist(N.Bb2, t+0.01, 0.30, 0.16);  // Bb2
+    _dist(N.Eb3, t+0.03, 0.28, 0.15);  // Eb3 — power chord
+    _dist(N.Bb3, t+0.04, 0.24, 0.12);  // Bb3 — quinta sopra
+
+    // === 2. LIGHTNING RUN (t=0 → t=0.42) — 16 note square fulminee ===
+    [N.C4,N.Eb4,N.G4,N.Bb4,N.C5,622.25,N.G5,N.Bb5,
+     N.C6,N.Bb5,N.G5,N.Bb5,N.C6,N.Bb5,N.G5,N.C6]
+      .forEach((f,i)=>_tone(f,t+i*0.027,0.04,0.12+Math.min(0.06,i*0.004),'square'));
+
+    // === 3. FANFARA TRIONFALE (da t=0.45) ===
+    // Melodia principale — square
+    [[N.C5,0.00,0.10],[N.G5,0.09,0.08],[N.C6,0.16,0.18],
+     [N.Bb5,0.32,0.06],[N.C6,0.37,0.06],[N.G5,0.43,0.06],
+     [N.Bb5,0.48,0.06],[N.C6,0.53,0.30],
+     [N.G5,0.82,0.05],[N.Bb5,0.87,0.05],[N.C6,0.92,0.52]]
+      .forEach(([f,dt,dur])=>_tone(f,t+0.45+dt,dur,0.22,'square'));
+    // Armonia a quinta sotto
+    [[N.G4,0.00,0.10],[N.D5,0.16,0.18],
+     [N.F4,0.32,0.22],[N.F4,0.53,0.30],[N.F4,0.92,0.52]]
+      .forEach(([f,dt,dur])=>_tone(f,t+0.45+dt,dur,0.10,'square'));
+    // Basso triangle
+    [[N.C3,0.00],[N.G3,0.16],[N.Bb3,0.37],[N.C3,0.53],[N.G3,0.92]]
+      .forEach(([f,dt])=>_tone(f,t+0.45+dt,0.18,0.14,'triangle'));
+
+    // === 4. SHIMMER SCINTILLANTE (da t=0.30) ===
+    [0,0.07,0.16,0.28,0.44,0.62,0.83,1.05].forEach((dt,i)=>
+      _tone(N.C6*(1.5+i*0.11),t+0.30+dt,0.065,0.05,'sine'));
+
+    // === 5. CHORD GROWL FINALE (t=1.55) ===
+    [[N.C3,0],[N.G3,0.05],[N.Eb3,0.10],[N.Bb3,0.15]].forEach(([f,dt])=>
+      _dist(f,t+1.55+dt,0.55,0.09));
   }
   function victory() {
     if (muted) return;
@@ -241,6 +286,7 @@ let hiScore = +localStorage.getItem('vegaRapHi') || 0;
 let objs = [], coins = [], msg = null, msgTimer = 0;
 let bgX = 0, nextObj, nextVeg, nextSeitan;
 let seitanActive = false, seitanTimer = 0;
+let seitanUsedThisLevel = false;
 const QUIPS = ['Il tofu mi dà la forza!','Abbasso il capitalismo carnivoro!',
   'Verdure per sempre!','La carne fa paura!','Soia power!!!','Il tempeh è vita!','Vegan pride!'];
 let quip = null, quipTimer = 0, nextQuip = 350;
@@ -282,7 +328,7 @@ function startGame() {
   R.x=100; R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
   R.movingLeft=false; R.movingRight=false;
   nextObj=80; nextVeg=70; nextSeitan=500;
-  seitanActive=false; seitanTimer=0;
+  seitanActive=false; seitanTimer=0; seitanUsedThisLevel=false;
   quip=null; quipTimer=0; nextQuip=350;
   boss=null; fb=null; bs=null; loopCount=0;
   VVAudio.setBPM(SPD_MIN); VVAudio.startTheme();
@@ -528,7 +574,7 @@ function drawHUD() {
     cx.fillText('🥩 BOSS! '+'🛡️'.repeat(3-boss.passCount)+'✅'.repeat(boss.passCount),400,26);
   } else if (state==='finalBoss'&&fb) {
     cx.fillStyle='#ff4444';
-    if (fb.phase==='fight') cx.fillText(`🦖 BARON VON BRACIOLA! Bistecche: ${fb.steaksDodged}/${fb.totalSteaks}`,400,26);
+    if (fb.phase==='fight') { const ri=!fb.ragePhase||fb.ragePhase===0?'😡':fb.ragePhase===1?'😡🔥🔥':'💢🔥🔥🔥'; cx.fillText(`🦖 BARON ${ri} ${fb.steaksDodged}/${fb.totalSteaks}`,400,26); }
     else if (fb.phase==='intro') cx.fillText('🦖 BARON VON BRACIOLA ARRIVA!!!',400,26);
     else if (fb.phase==='flee') cx.fillText('🏃 BARON VON BRACIOLA FUGGE!!! 🌿',400,26);
     else if (fb.phase==='freed'||fb.phase==='romance') {cx.fillStyle='#ff69b4';cx.fillText('💕 GO VEG! ❤️ 💕',400,26);}
@@ -578,11 +624,12 @@ function drawFinalBossScene() {
   drawTouchZones();
 
   if (fb.phase==='fight') {
-    // Bistecche volanti
+    // Bistecche volanti — dimensione varia con velocità
     fb.steaks.forEach(s => {
+      const sz = s.speed > 10 ? 36 : s.speed > 7 ? 30 : 24;
       cx.save();
       cx.translate(s.x+16,s.y-14);cx.rotate(s.angle);
-      cx.font='32px serif';cx.textAlign='center';cx.fillText('🥩',0,0);
+      cx.font=`${sz}px serif`;cx.textAlign='center';cx.fillText('🥩',0,0);
       cx.restore();
     });
   }
@@ -700,17 +747,39 @@ function updateFinalBoss() {
 
     case 'fight': {
       if (fb.hitCooldown>0) fb.hitCooldown--;
-      // Lancia bistecche — 2 altezze: ABBASSATI (GND-22) o SALTA (GND-8)
-      // hitbox steak: {y:s.y-30, h:28}
-      // GND-22=318 → box [288,316]: colpisce in piedi (291-334), NON duck (318-334) → ABBASSATI
-      // GND-8=332  → box [302,330]: colpisce sia in piedi che duck → SALTA
-      if (--fb.nextSteak<=0 && fb.steaksDodged<fb.totalSteaks) {
-        const sy=Math.random()<0.5 ? GND-22 : GND-8;
-        const spBase=5.5+loopCount*0.4+Math.random()*1.0;
-        fb.steaks.push({x:fb.trexX-18,y:sy,speed:spBase,angle:0});
-        fb.nextSteak=70+Math.floor(Math.random()*50);
+      // 3 altezze:
+      // GND-38=302 → sBox [272,300]: colpisce piedi (291-334), NON duck (318-334) → ABBASSATI
+      // GND-22=318 → sBox [288,316]: colpisce piedi, NON duck → ABBASSATI o SALTA (scegliere)
+      // GND-8=332  → sBox [302,330]: colpisce sia piedi che duck → SALTA obbligatorio
+      if (!fb.ragePhase) fb.ragePhase=0;
+      const curProgress = fb.steaksDodged / fb.totalSteaks;
+      const newRage = curProgress>=0.66 ? 2 : curProgress>=0.33 ? 1 : 0;
+      if (newRage > fb.ragePhase) {
+        fb.ragePhase=newRage;
+        msg=newRage===1 ? '🔥 BARON si sta arrabbiando!!!':'💢 BARON in PIENA FURIA!!!';
+        msgTimer=110; VVAudio.trexRoar();
       }
-      // Muovi bistecche — traiettoria rettilinea orizzontale, velocità costante
+      if (--fb.nextSteak<=0 && fb.steaksDodged<fb.totalSteaks) {
+        const progress = fb.steaksDodged / fb.totalSteaks;
+        let waveSize, speedMin, speedMax, interval;
+        if (progress < 0.33) {
+          waveSize=1+(Math.random()<0.35?1:0);
+          speedMin=4.5; speedMax=7.0; interval=65+Math.floor(Math.random()*45);
+        } else if (progress < 0.66) {
+          waveSize=2+(Math.random()<0.5?1:0);
+          speedMin=6.0; speedMax=10.0; interval=45+Math.floor(Math.random()*30);
+        } else {
+          waveSize=3+(Math.random()<0.55?1:0);
+          speedMin=7.5; speedMax=14.0; interval=28+Math.floor(Math.random()*22);
+        }
+        const HEIGHTS=[GND-38, GND-22, GND-8];
+        for (let i=0; i<waveSize; i++) {
+          const sy=HEIGHTS[Math.floor(Math.random()*HEIGHTS.length)];
+          const sp=speedMin+Math.random()*(speedMax-speedMin)+loopCount*0.4;
+          fb.steaks.push({x:fb.trexX-18-i*24, y:sy, speed:sp, angle:0});
+        }
+        fb.nextSteak=interval;
+      }
       const rb=rBox();
       fb.steaks=fb.steaks.filter(s=>{
         s.x-=s.speed; s.angle+=0.06;
@@ -831,9 +900,9 @@ function update() {
     nextVeg=Math.max(45,110-level*4)+Math.floor(Math.random()*38);
   }
   // Spawn seitan
-  if(--nextSeitan<=0&&!seitanActive){
+  if(--nextSeitan<=0&&!seitanActive&&!seitanUsedThisLevel){
     coins.push({emoji:'🌾',msg:'BESTIA DI SEITAN!!!',pts:30,x:820,y:GND-85,h:45,w:45,isSeitan:true});
-    nextSeitan=600+Math.floor(Math.random()*400);
+    nextSeitan=99999;
   }
   // Quips
   if(!quip&&--nextQuip<=0){
@@ -856,6 +925,7 @@ function update() {
     if(ov(rb,v)){
       if(v.isSeitan){
         seitanActive=true;seitanTimer=SEITAN_DUR;score+=v.pts;levelScore+=v.pts;
+        seitanUsedThisLevel=true;
         msg='Ora sono un super veg-velociraptor: una BESTIA DI SEITAN!';msgTimer=230;VVAudio.seitanPowerUp();
       } else {
         score+=v.pts;levelScore+=v.pts;
@@ -981,8 +1051,8 @@ function updateBonusStage() {
     bs=null;
     state='finalBoss';
     fb={phase:'intro',trexX:920,trexVX:0,gfX:720,gfVX:0,
-        steaks:[],steaksDodged:0,totalSteaks:10+loopCount*2,
-        nextSteak:110,hitCooldown:60,phaseTimer:0,hearts:[]};
+        steaks:[],steaksDodged:0,totalSteaks:22+loopCount*4,
+        nextSteak:110,hitCooldown:60,phaseTimer:0,hearts:[],ragePhase:0};
     msg='⚠️ BARON VON BRACIOLA tiene in ostaggio la tua fidanzata!!!';msgTimer=200;
     VVAudio.stopTheme();
   }
@@ -1084,7 +1154,7 @@ function loop() {
   if(state==='bonusStage'){drawBonusStage();return;}
   if(state==='finalBoss'){drawFinalBossScene();return;}
   if(state==='lvlend'){
-    if(--levelTimer<=0){level++;lives=5;state='play';nextObj=80;nextVeg=70;}
+    if(--levelTimer<=0){level++;lives=5;state='play';nextObj=80;nextVeg=70;nextSeitan=500;seitanUsedThisLevel=false;}
     drawLevelEnd();drawHUD();return;
   }
   if(state==='loopEnd'){
@@ -1093,7 +1163,7 @@ function loop() {
       level=1; lives=5; spdMod=0; levelScore=0; levelTimer=0;
       objs=[]; coins=[]; boss=null; fb=null; bs=null;
       nextObj=80; nextVeg=70; nextSeitan=500;
-      seitanActive=false; seitanTimer=0;
+      seitanActive=false; seitanTimer=0; seitanUsedThisLevel=false;
       R.x=100; R.y=GND-PH; R.vy=0; R.jumping=false; R.duck=false; R.jumps=0;
       R.movingLeft=false; R.movingRight=false;
       state='play';
