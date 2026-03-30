@@ -30,6 +30,8 @@ canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; }
 <canvas id="c"></canvas>
 <button id="mute-btn" title="Mute/Unmute">🔊</button>
 <audio id="bg-music" src="11 - Vegan Velociraptor.mp3" loop preload="auto"></audio>
+<audio id="funeral-music" src="Chopin - Marcia funebre.mp3" preload="auto"></audio>
+<audio id="victory-music" src="Victory song.mp3" preload="auto"></audio>
 <script>
 const c = document.getElementById('c'), cx = c.getContext('2d');
 c.width = 800; c.height = 400;
@@ -59,7 +61,15 @@ const VVAudio = (() => {
   let _ctx = null, _master = null;
   let muted = false;
   let _bgm = null, _bgmActive = false;
-  function _getBgm() { if(!_bgm) _bgm=document.getElementById('bg-music'); return _bgm; }
+  function _getBgm()     { if(!_bgm) _bgm=document.getElementById('bg-music'); return _bgm; }
+  let _specialActive = null;
+  function _getFuneral() { return document.getElementById('funeral-music'); }
+  function _getVictory() { return document.getElementById('victory-music'); }
+  function _stopSpecial() {
+    _specialActive=null;
+    const f=_getFuneral(), v=_getVictory();
+    f.pause(); f.currentTime=0; v.pause(); v.currentTime=0;
+  }
 
   const N = {
     Bb2:116.54,
@@ -96,8 +106,8 @@ const VVAudio = (() => {
     return tot;
   }
 
-  function startTheme()  { _bgmActive=true;  if(!muted) _getBgm().play().catch(()=>{}); }
-  function stopTheme()   { _bgmActive=false; _getBgm().pause(); }
+  function startTheme()  { _stopSpecial(); _bgmActive=true;  if(!muted) _getBgm().play().catch(()=>{}); }
+  function stopTheme()   { _bgmActive=false; _getBgm().pause(); _stopSpecial(); }
   function setBPM()      {}
 
   function vegJingle() {
@@ -171,28 +181,10 @@ const VVAudio = (() => {
     _tone(N.C3,t,1.0,0.13,'triangle');
   }
   function funeralMarch() {
-    if (muted) return; stopTheme();
-    const a=_ac(),t0=a.currentTime+0.5,q=1,e=0.5,h=2,dq=1.5;
-    const mel=[
-      [N.Bb3,e],[N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,dq],[N.R,e],
-      [N.Eb3,e],[N.Eb3,e],[N.Bb2,q],[N.Ab3,dq],[N.R,e],
-      [N.Ab3,e],[N.Ab3,e],[N.Eb3,q],[N.Db3,dq],[N.R,e],
-      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,h],[N.R,q],
-      [N.Eb4,dq],[N.F4,e],[N.Eb4,q],[N.Db4,q],[N.Bb3,h],[N.Eb4,q],[N.R,q],
-      [N.Db4,dq],[N.Eb4,e],[N.Db4,q],[N.Bb3,q],[N.Ab3,h+q],[N.R,q],
-      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,dq],[N.R,e],
-      [N.Eb3,e],[N.Eb3,e],[N.Bb2,q],[N.Ab3,dq],[N.R,e],
-      [N.Bb3,e],[N.Bb3,e],[N.F3,q],[N.Eb3,h+q],
-    ];
-    const bas=[
-      [N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],
-      [N.Ab3,q],[N.Ab3,q],[N.Ab3,q],[N.Ab3,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,h+q],
-      [N.Ab3,q],[N.Ab3,q],[N.Gb3,q],[N.Gb3,q],[N.Eb3,q],[N.Eb3,q],[N.F3,q],[N.R,q],
-      [N.Db3,q],[N.Db3,q],[N.Eb3,q],[N.Eb3,q],[N.Ab3,q],[N.Ab3,q],[N.R,h+q],
-      [N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Bb2,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],[N.Eb3,q],
-      [N.Bb2,q],[N.Bb2,q],[N.Bb2,h+q],
-    ];
-    _seq(mel,t0,1,0.22,'square'); _seq(bas,t0,1,0.11,'triangle');
+    stopTheme();
+    _specialActive='funeral';
+    const f=_getFuneral(); f.currentTime=0;
+    if(!muted) f.play().catch(()=>{});
   }
 
   // === FINAL BOSS SOUNDS ===
@@ -228,16 +220,10 @@ const VVAudio = (() => {
     _seq(love,t0,q,0.2,'sine'); _seq(lovBas,t0,q,0.1,'triangle');
   }
   function finalVictory() {
-    if (muted) return; stopTheme();
-    const a=_ac(),t0=a.currentTime+0.2,q=60/140/2;
-    const fan=[
-      [N.C5,1],[N.C5,1],[N.C5,1],[N.G5,4],[N.R,2],
-      [N.F5,1],[N.G5,1],[N.A5,1],[N.Bb5,1],[N.A5,1],[N.G5,4],[N.R,2],
-      [N.C6,2],[N.G5,2],[N.E5,2],[N.C5,2],
-      [N.G5,2],[N.E5,2],[N.G5,2],[N.C6,4],
-    ];
-    _seq(fan,t0,q,0.24,'square');
-    [N.C3,N.G3,N.E3,N.C3].forEach((f,i)=>_tone(f,t0+i*1.2,1.1,0.12,'triangle'));
+    stopTheme();
+    _specialActive='victory';
+    const v=_getVictory(); v.currentTime=0;
+    if(!muted) v.play().catch(()=>{});
   }
 
   function startBonusTheme() { _bgmActive=true; if(!muted) _getBgm().play().catch(()=>{}); }
@@ -245,9 +231,11 @@ const VVAudio = (() => {
   function toggleMute() {
     muted=!muted;
     if(_master) _master.gain.value=muted?0:0.28;
-    const m=_getBgm();
-    if(muted) { m.pause(); }
+    const m=_getBgm(), f=_getFuneral(), v=_getVictory();
+    if(muted) { m.pause(); f.pause(); v.pause(); }
     else if(_bgmActive) { m.play().catch(()=>{}); }
+    else if(_specialActive==='funeral') { f.play().catch(()=>{}); }
+    else if(_specialActive==='victory') { v.play().catch(()=>{}); }
     return muted;
   }
   return { startTheme,stopTheme,startBonusTheme,setBPM,vegJingle,lifeLost,
