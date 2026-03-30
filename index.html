@@ -29,6 +29,7 @@ canvas { display:block; border:3px solid #4ecdc4; border-radius:8px; }
 </div>
 <canvas id="c"></canvas>
 <button id="mute-btn" title="Mute/Unmute">🔊</button>
+<audio id="bg-music" src="https://drive.google.com/uc?export=download&id=1aXCj-argFltL6606MGfYtr5ZnVR6nijX" loop preload="auto"></audio>
 <script>
 const c = document.getElementById('c'), cx = c.getContext('2d');
 c.width = 800; c.height = 400;
@@ -56,7 +57,9 @@ const ov = (a, b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h 
 // ===== 🎵 8-BIT AUDIO ENGINE =====
 const VVAudio = (() => {
   let _ctx = null, _master = null;
-  let muted = false, themeTimer = null, themeActive = false, _bpm = 165;
+  let muted = false;
+  let _bgm = null, _bgmActive = false;
+  function _getBgm() { if(!_bgm) _bgm=document.getElementById('bg-music'); return _bgm; }
 
   const N = {
     Bb2:116.54,
@@ -93,27 +96,9 @@ const VVAudio = (() => {
     return tot;
   }
 
-  const MEL = [
-    [N.C5,1],[N.E5,1],[N.G5,2],[N.A5,1],[N.G5,1],[N.F5,2],
-    [N.E5,1],[N.G5,1],[N.C5,2],[N.D5,1],[N.F5,1],[N.G5,2],
-    [N.C6,2],[N.Bb5,2],[N.A5,1],[N.G5,1],[N.F5,2],
-    [N.E5,1],[N.D5,1],[N.E5,1],[N.F5,1],[N.C5,4],
-  ];
-  const BAS = [
-    [N.C3,2],[N.C3,2],[N.F3,2],[N.G3,2],[N.C3,2],[N.G3,2],[N.G3,4],
-    [N.Ab3,2],[N.Bb3,2],[N.F3,2],[N.F3,2],[N.G3,2],[N.G3,2],[N.C3,4],
-  ];
-
-  function _schedLoop() {
-    if (!themeActive || muted) return;
-    const a = _ac(), bd = 60/_bpm, t0 = a.currentTime+0.04;
-    const dur = _seq(MEL,t0,bd,0.17,'square');
-    _seq(BAS,t0,bd,0.09,'triangle');
-    themeTimer = setTimeout(_schedLoop,(dur-0.06)*1000);
-  }
-  function startTheme() { stopTheme(); themeActive=true; _schedLoop(); }
-  function stopTheme()  { themeActive=false; if(themeTimer){clearTimeout(themeTimer);themeTimer=null;} }
-  function setBPM(s)    { _bpm=Math.max(165,Math.min(260,130+s*10)); }
+  function startTheme()  { _bgmActive=true;  if(!muted) _getBgm().play().catch(()=>{}); }
+  function stopTheme()   { _bgmActive=false; _getBgm().pause(); }
+  function setBPM()      {}
 
   function vegJingle() {
     if (muted) return;
@@ -255,17 +240,14 @@ const VVAudio = (() => {
     [N.C3,N.G3,N.E3,N.C3].forEach((f,i)=>_tone(f,t0+i*1.2,1.1,0.12,'triangle'));
   }
 
-  // Tema frenetico per la Bonus Stage (BPM fisso alto)
-  function startBonusTheme() {
-    stopTheme();
-    themeActive=true; _bpm=252;
-    _schedLoop();
-  }
+  function startBonusTheme() { _bgmActive=true; if(!muted) _getBgm().play().catch(()=>{}); }
 
   function toggleMute() {
     muted=!muted;
     if(_master) _master.gain.value=muted?0:0.28;
-    if(muted) stopTheme();
+    const m=_getBgm();
+    if(muted) { m.pause(); }
+    else if(_bgmActive) { m.play().catch(()=>{}); }
     return muted;
   }
   return { startTheme,stopTheme,startBonusTheme,setBPM,vegJingle,lifeLost,
